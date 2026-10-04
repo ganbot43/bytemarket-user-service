@@ -5,14 +5,74 @@ Cuentas, autenticación y perfiles. Es quien **firma** los tokens JWT que el res
 Parte del sistema **ByteMarket**, una tienda de repuestos y accesorios para
 celulares construida con microservicios Spring Boot y un frontend Nuxt.
 
-## Qué hace
+**Puerto 8081** · Base de datos `bytemarket_user`
 
-- Registro e inicio de sesión (`/api/auth/**`), con contraseñas en BCrypt
-- Emisión del JWT con los claims `uid` y `role`, para que los demás servicios no tengan que consultar la base de usuarios
-- Perfil del cliente (`/api/mi-perfil`) y configuración del negocio
-- Gestión de usuarios del panel (`/api/admin/users`)
+## API
 
-Base de datos: `bytemarket_user`
+Todo entra por el gateway (`http://localhost:8085`), no directamente al 8081.
+
+### Autenticación — público
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `POST` | `/api/auth/register` | Crea la cuenta. Body: `name`, `email`, `password`, `phone?`, `dni?` |
+| `POST` | `/api/auth/login` | Devuelve `{user, token}` y deja la cookie `jwt_token` |
+| `POST` | `/api/auth/logout` | Limpia la cookie |
+| `GET` | `/api/auth/me` | Datos del usuario de la sesión |
+
+### Cliente — requiere sesión
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/api/mi-perfil` | Perfil: nombre, teléfono, DNI, dirección |
+| `PUT` | `/api/mi-perfil` | Actualiza el perfil. Solo cuentas con rol `customer` |
+| `POST` | `/api/users/profile` | Actualiza perfil con foto (`multipart/form-data`) |
+| `GET` | `/api/business-config` | Datos públicos del negocio (nombre, logo, WhatsApp) |
+
+### Panel — requiere rol `admin` o `superadmin`
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/api/admin/users` | Lista de usuarios y clientes |
+| `POST` | `/api/admin/users` | Crea un usuario |
+| `PUT` | `/api/admin/users/{id}` | Edita un usuario |
+| `PUT` `PATCH` | `/api/admin/users/{id}/status` | Activa o suspende la cuenta |
+| `DELETE` | `/api/admin/users/{id}` | Elimina un usuario |
+| `GET` | `/api/admin/business-config` | Configuración del negocio |
+| `PUT` | `/api/admin/business-config` | Actualiza la configuración |
+
+### Ejemplo
+
+```bash
+curl -X POST http://localhost:8085/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@bytemarket.com","password":"admin123"}'
+```
+
+```json
+{ "message": "Login exitoso",
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "user": { "id": 2, "name": "Encargado de tienda",
+            "email": "admin@bytemarket.com", "role": "admin" } }
+```
+
+## El JWT
+
+El token es HS256 y lleva los claims **`uid`** y **`role`** además del `sub`
+(el correo). Los demás servicios leen el rol de ahí y **no consultan esta
+base**: por eso catalog, order y support autorizan sin depender de este
+servicio.
+
+Un token de una cuenta suspendida sigue siendo criptográficamente válido, así
+que el filtro comprueba el estado de la cuenta en cada petición.
+
+### Usuarios del sembrado
+
+| Rol | Correo | Contraseña |
+|---|---|---|
+| Superadmin | `owner@bytemarket.com` | `admin123` |
+| Admin | `admin@bytemarket.com` | `admin123` |
+| Cliente | `cliente@bytemarket.com` | `cliente123` |
 
 ## Cómo levantarlo
 
