@@ -56,13 +56,8 @@ public class S3Service {
     }
 
     public String uploadFile(MultipartFile file, String folder) throws IOException {
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        
-        String prefix = (rootPrefix != null && !rootPrefix.trim().isEmpty()) ? rootPrefix.trim() + "/" : "";
-        String folderPath = (folder != null && !folder.trim().isEmpty()) ? folder.trim() + "/" : "";
-        
-        String fileName = String.format("%s%s%s/%s-%s", prefix, folderPath, datePath, UUID.randomUUID().toString(), file.getOriginalFilename());
-        
+        String fileName = construirClave(folder, file.getOriginalFilename());
+
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentType(file.getContentType());
         metadata.setContentLength(file.getSize());
@@ -74,6 +69,42 @@ public class S3Service {
         // URL absoluta, no la key: es lo que se guarda en base y lo que
         // getPresignedUrl sabe volver a firmar al momento de leer.
         return s3client.getUrl(bucketName, fileName).toString();
+    }
+
+    /**
+     * La clave del objeto en S3: {prefijo}/{carpeta}/{aaaa}/{MM}/{dd}/{uuid}.{ext}
+     *
+     * La fecha no es por rendimiento —S3 escala solo por prefijo desde 2018—
+     * sino para poder operar: aplicar reglas de ciclo de vida por antigüedad,
+     * listar lo subido un día concreto cuando algo salió mal, y no tener que
+     * paginar una carpeta de decenas de miles de objetos para encontrar uno.
+     *
+     * Del nombre original se conserva SOLO la extensión. Meterlo entero deja
+     * espacios y acentos dentro de la clave para siempre, y un nombre con
+     * barra —"mis fotos/perfil.jpg"— crearía un nivel de carpeta que nadie
+     * pidió. El nombre lo pone el servidor.
+     */
+    String construirClave(String folder, String originalFilename) {
+        String prefijo = (rootPrefix == null || rootPrefix.isBlank()) ? "" : rootPrefix.trim() + "/";
+        String carpeta = (folder == null || folder.isBlank()) ? "" : folder.trim() + "/";
+        String fecha = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+
+        return prefijo + carpeta + fecha + "/" + UUID.randomUUID() + extension(originalFilename);
+    }
+
+    /** La extensión, si es una extensión de verdad y no un nombre disfrazado. */
+    private static String extension(String originalFilename) {
+        if (originalFilename == null) return "";
+
+        // Un nombre puede llegar con ruta; solo interesa la última parte.
+        String base = originalFilename.replace('\\', '/');
+        base = base.substring(base.lastIndexOf('/') + 1);
+
+        int punto = base.lastIndexOf('.');
+        if (punto < 0) return "";
+
+        String ext = base.substring(punto).toLowerCase();
+        return ext.matches("\\.[a-z0-9]{1,8}") ? ext : "";
     }
 
     public String generatePresignedUrl(String key) {
