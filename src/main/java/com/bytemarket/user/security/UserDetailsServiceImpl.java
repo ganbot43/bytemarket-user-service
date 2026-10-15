@@ -1,8 +1,8 @@
 package com.bytemarket.user.security;
 
+import lombok.RequiredArgsConstructor;
 import com.bytemarket.user.model.User;
 import com.bytemarket.user.repository.IUserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -13,10 +13,10 @@ import java.util.Collections;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @Service
+@RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
 
-    @Autowired
-    private IUserRepository userRepository;
+    private final IUserRepository userRepository;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {

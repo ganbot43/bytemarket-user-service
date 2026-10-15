@@ -1,11 +1,11 @@
 package com.bytemarket.user.controller.api;
 
+import lombok.RequiredArgsConstructor;
 import com.bytemarket.user.model.Customer;
 import com.bytemarket.user.model.User;
 import com.bytemarket.user.repository.ICustomerRepository;
 import com.bytemarket.user.repository.IUserRepository;
 import com.bytemarket.user.service.S3Service;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,16 +17,14 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class ApiProfileController {
 
-    @Autowired
-    private IUserRepository userRepository;
+    private final IUserRepository userRepository;
 
-    @Autowired
-    private ICustomerRepository customerRepository;
+    private final ICustomerRepository customerRepository;
 
-    @Autowired
-    private S3Service s3Service;
+    private final S3Service s3Service;
 
     @PostMapping("/profile")
     @org.springframework.transaction.annotation.Transactional

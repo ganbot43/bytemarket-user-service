@@ -1,5 +1,7 @@
 package com.bytemarket.user.controller.api;
 
+import com.bytemarket.user.service.S3Service;
+import lombok.RequiredArgsConstructor;
 import com.bytemarket.user.model.BusinessConfig;
 import com.bytemarket.user.model.Customer;
 import com.bytemarket.user.model.User;
@@ -8,7 +10,6 @@ import com.bytemarket.user.repository.ICustomerRepository;
 import com.bytemarket.user.repository.IUserRepository;
 import com.bytemarket.user.service.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -28,15 +29,16 @@ import static com.bytemarket.user.controller.api.ApiAccountController.limpiar;
  */
 @RestController
 @RequestMapping("/api/admin")
+@RequiredArgsConstructor
 public class ApiAdminUserController {
 
     private static final Set<String> ROLES_VALIDOS = Set.of("customer", "admin", "superadmin");
 
-    @Autowired private IUserRepository userRepository;
-    @Autowired private ICustomerRepository customerRepository;
-    @Autowired private IBusinessConfigRepository businessConfigRepository;
-    @Autowired private AuthService authService;
-    @Autowired private com.bytemarket.user.service.S3Service s3Service;
+    private final IUserRepository userRepository;
+    private final ICustomerRepository customerRepository;
+    private final IBusinessConfigRepository businessConfigRepository;
+    private final AuthService authService;
+    private final S3Service s3Service;
 
     private final ObjectMapper mapper = new ObjectMapper();
 

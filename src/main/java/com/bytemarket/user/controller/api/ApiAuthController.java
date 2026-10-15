@@ -1,12 +1,12 @@
 package com.bytemarket.user.controller.api;
 
+import lombok.RequiredArgsConstructor;
 import com.bytemarket.user.model.Customer;
 import com.bytemarket.user.model.User;
 import com.bytemarket.user.repository.ICustomerRepository;
 import com.bytemarket.user.repository.IUserRepository;
 import com.bytemarket.user.service.AuthService;
 import com.bytemarket.user.security.JwtUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,19 +18,16 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class ApiAuthController {
 
-    @Autowired
-    private IUserRepository userRepository;
+    private final IUserRepository userRepository;
 
-    @Autowired
-    private ICustomerRepository customerRepository;
+    private final ICustomerRepository customerRepository;
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
 
-    @Autowired
-    private JwtUtils jwtUtils;
+    private final JwtUtils jwtUtils;
 
     // Endpoint genérico de Login que Nuxt podría usar
     @PostMapping("/login")

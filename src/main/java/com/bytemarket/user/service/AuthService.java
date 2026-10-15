@@ -1,14 +1,14 @@
 package com.bytemarket.user.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
     // Genera el hash idéntico al que genera bcryptjs en Node/Nuxt
     public String hashPassword(String plainPassword) {

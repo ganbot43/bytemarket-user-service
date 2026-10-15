@@ -1,5 +1,7 @@
 package com.bytemarket.user.controller.api;
 
+import com.bytemarket.user.service.S3Service;
+import lombok.RequiredArgsConstructor;
 import com.bytemarket.user.model.BusinessConfig;
 import com.bytemarket.user.model.Customer;
 import com.bytemarket.user.model.User;
@@ -7,7 +9,6 @@ import com.bytemarket.user.repository.IBusinessConfigRepository;
 import com.bytemarket.user.repository.ICustomerRepository;
 import com.bytemarket.user.repository.IUserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -22,12 +23,13 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class ApiAccountController {
 
-    @Autowired private IUserRepository userRepository;
-    @Autowired private ICustomerRepository customerRepository;
-    @Autowired private IBusinessConfigRepository businessConfigRepository;
-    @Autowired private com.bytemarket.user.service.S3Service s3Service;
+    private final IUserRepository userRepository;
+    private final ICustomerRepository customerRepository;
+    private final IBusinessConfigRepository businessConfigRepository;
+    private final S3Service s3Service;
 
     private final ObjectMapper mapper = new ObjectMapper();
 

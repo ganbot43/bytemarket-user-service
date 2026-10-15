@@ -1,12 +1,12 @@
 package com.bytemarket.user.config;
 
+import lombok.RequiredArgsConstructor;
 import com.bytemarket.user.model.BusinessConfig;
 import com.bytemarket.user.model.Customer;
 import com.bytemarket.user.model.User;
 import com.bytemarket.user.repository.IBusinessConfigRepository;
 import com.bytemarket.user.repository.ICustomerRepository;
 import com.bytemarket.user.repository.IUserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -18,19 +18,16 @@ import java.util.List;
  * Es idempotente: solo crea lo que falta y migra datos antiguos de "CelParts".
  */
 @Component
+@RequiredArgsConstructor
 public class DatabaseSeeder implements CommandLineRunner {
 
-    @Autowired
-    private IUserRepository userRepository;
+    private final IUserRepository userRepository;
 
-    @Autowired
-    private ICustomerRepository customerRepository;
+    private final ICustomerRepository customerRepository;
 
-    @Autowired
-    private IBusinessConfigRepository businessConfigRepository;
+    private final IBusinessConfigRepository businessConfigRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {
