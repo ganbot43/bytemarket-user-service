@@ -30,6 +30,9 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
+                // Sonda de salud: la consulta el healthcheck de Docker, que
+                // no tiene con qué autenticarse. Solo expone UP o DOWN.
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(
                     "/api/auth/login", 
                     "/api/auth/register", 
