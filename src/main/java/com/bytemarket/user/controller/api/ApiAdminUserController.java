@@ -83,21 +83,34 @@ public class ApiAdminUserController {
 
     // ─── USUARIOS / CLIENTES ────────────────────────────────────
 
+    /**
+     * Listado de usuarios del panel.
+     *
+     * `role` admite varios separados por coma ("admin,superadmin") para que
+     * la pantalla de personal los vea en una sola lista paginada. Sigue
+     * devolviendo clientes si no se pide nada, que es lo que hacía antes.
+     */
     @GetMapping("/users")
     public ResponseEntity<?> getUsers(@RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "10") int size,
-                                      @RequestParam(defaultValue = "customer") String role) {
-        Page<User> users = userRepository.findByRole(role,
+                                      @RequestParam(defaultValue = "customer") String role,
+                                      @RequestParam(required = false) String q) {
+        List<String> roles = Arrays.stream(role.split(","))
+                .map(String::trim).filter(r -> !r.isBlank())
+                .filter(ROLES_VALIDOS::contains)
+                .toList();
+        if (roles.isEmpty()) return error(400, "Rol inválido: " + role);
+
+        String patron = (q == null || q.isBlank()) ? null : "%" + q.trim().toLowerCase() + "%";
+        Page<User> users = userRepository.buscarPorRoles(roles, patron,
                 PageRequest.of(page, Math.max(1, size), Sort.by("createdAt").descending()));
 
         List<Integer> ids = users.getContent().stream().map(User::getId).toList();
         Map<Integer, Customer> fichas = ids.isEmpty() ? Map.of()
                 : customerRepository.findByUserIdIn(ids).stream()
                     .collect(Collectors.toMap(c -> c.getUser().getId(), c -> c));
-
         List<Map<String, Object>> data = users.getContent().stream()
                 .map(u -> toClienteDTO(u, fichas.get(u.getId()))).toList();
-
         return ResponseEntity.ok(Map.of("data", data, "total", users.getTotalElements()));
     }
 
