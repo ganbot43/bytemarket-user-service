@@ -109,6 +109,11 @@ public class ApiAdminUserController {
                                       @RequestParam(defaultValue = "10") int size,
                                       @RequestParam(defaultValue = "customer") String role,
                                       @RequestParam(required = false) String q) {
+        /* El jefe de ventas solo ve cajeros, aunque pida otra cosa en el
+           parámetro: si no, desde la misma pantalla en la que da de alta a
+           su gente podría listar los correos de la dirección. */
+        if (soloPuedeCajeros()) role = "cajero";
+
         List<String> roles = Arrays.stream(role.split(","))
                 .map(String::trim).filter(r -> !r.isBlank())
                 .filter(ROLES_VALIDOS::contains)
@@ -237,6 +242,13 @@ public class ApiAdminUserController {
 
     @RequestMapping(value = "/users/{id}/status", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<?> updateStatus(@PathVariable Integer id, @RequestBody Map<String, Object> body) {
+        // Faltaba, y era la puerta de atrás: guardar crear, editar y borrar
+        // no sirve de nada si activar y desactivar queda abierto. Por aquí
+        // un jefe de ventas podía desactivar al gerente.
+        if (soloPuedeCajeros()) {
+            String rol = userRepository.findById(id).map(User::getRole).orElse(null);
+            if (!"cajero".equals(rol)) return soloCajeros();
+        }
         return userRepository.findById(id).<ResponseEntity<?>>map(user -> {
             if (body.get("isActive") instanceof Number n) {
                 user.setIsActive(n.intValue());
