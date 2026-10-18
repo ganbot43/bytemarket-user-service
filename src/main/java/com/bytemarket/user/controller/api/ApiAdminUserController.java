@@ -143,16 +143,65 @@ public class ApiAdminUserController {
      * justifica todo esto se vendría abajo.
      */
     private static boolean soloPuedeCajeros() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) return false;
-        var roles = auth.getAuthorities().stream().map(Object::toString).toList();
-        return roles.contains("ROLE_JEFE_VENTAS")
-                && !roles.contains("ROLE_ADMIN") && !roles.contains("ROLE_SUPERADMIN");
+        return tieneRol("JEFE_VENTAS") && !tieneRol("ADMIN") && !tieneRol("SUPERADMIN");
     }
 
     private static ResponseEntity<Map<String, Object>> soloCajeros() {
         return ResponseEntity.status(403).body(Map.of("statusCode", 403,
                 "message", "Como jefe de ventas solo puedes gestionar cajeros."));
+    }
+
+    private static boolean tieneRol(String rol) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        return auth.getAuthorities().stream().map(Object::toString).anyMatch(("ROLE_" + rol)::equals);
+    }
+
+    /**
+     * El puesto de gerente solo lo reparte un gerente.
+     *
+     * Faltaba, y era una escalada en toda regla: el encargado podía crearse
+     * un gerente, ascenderse él mismo a gerente, o —peor— degradar o borrar
+     * al gerente que ya había y quedarse como la única autoridad del
+     * sistema. La pantalla no le ofrecía la opción, pero la pantalla no es
+     * el control: una llamada a la API con role=superadmin bastaba.
+     *
+     * Cubre las cuatro puertas —crear, editar, activar y borrar— y mira
+     * tanto el rol que se quiere poner como el que la persona YA tiene: lo
+     * primero impide fabricar un gerente, lo segundo tocar al que existe.
+     */
+    private static boolean esGerente() {
+        return tieneRol("SUPERADMIN");
+    }
+
+    private static ResponseEntity<Map<String, Object>> soloElGerente() {
+        return ResponseEntity.status(403).body(Map.of("statusCode", 403,
+                "message", "Solo el gerente puede crear, modificar o dar de baja a otro gerente."));
+    }
+
+    /** El correo de quien llama: es como lo identifica el token. */
+    private static String quienLlama() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth == null ? null : auth.getName();
+    }
+
+    private static boolean esElMismo(User user) {
+        String yo = quienLlama();
+        return yo != null && yo.equalsIgnoreCase(user.getEmail());
+    }
+
+    /**
+     * Nadie se cambia su propio rol, ni se desactiva, ni se borra.
+     *
+     * Hacia arriba sería ascenderse —ya lo impide {@link #esGerente()}— y
+     * hacia abajo es quedarse fuera del panel sin que nadie pueda
+     * devolverte: si el único gerente se degrada, el sistema se queda sin
+     * quien reparta el puesto. La pantalla ya lo evitaba, pero solo en la
+     * pantalla.
+     */
+    private static ResponseEntity<Map<String, Object>> contraTiMismo(String que) {
+        return ResponseEntity.status(403).body(Map.of("statusCode", 403,
+                "message", "No puedes " + que + " tu propia cuenta. Pídeselo a otro gerente."));
     }
 
     @PostMapping("/users")
@@ -170,6 +219,7 @@ public class ApiAdminUserController {
         if (password.length() < 6) return error(400, "La contraseña debe tener al menos 6 caracteres");
         if (!ROLES_VALIDOS.contains(role)) return error(400, "Rol inválido: " + role);
         if (soloPuedeCajeros() && !"cajero".equals(role)) return soloCajeros();
+        if ("superadmin".equals(role) && !esGerente()) return soloElGerente();
         if (userRepository.findByEmail(email).isPresent()) return error(400, "El correo ya está registrado");
         if (dni != null && customerRepository.existsByDni(dni)) return error(400, "El DNI ya está registrado");
 
@@ -212,6 +262,15 @@ public class ApiAdminUserController {
                 && (!"cajero".equals(user.getRole()) || (role != null && !"cajero".equals(role)))) {
             return soloCajeros();
         }
+        // Mismo criterio con el gerente: el rol que tiene y el que se le
+        // quiere poner. Sin la primera mitad, un encargado degradaba al
+        // gerente a cliente y se quedaba mandando él.
+        if (!esGerente() && ("superadmin".equals(user.getRole()) || "superadmin".equals(role))) {
+            return soloElGerente();
+        }
+        if (role != null && !role.equals(user.getRole()) && esElMismo(user)) {
+            return contraTiMismo("cambiarle el rol a");
+        }
 
         Customer ficha = customerRepository.findByUserId(user.getId()).orElse(null);
         String dni = null;
@@ -242,31 +301,40 @@ public class ApiAdminUserController {
 
     @RequestMapping(value = "/users/{id}/status", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<?> updateStatus(@PathVariable Integer id, @RequestBody Map<String, Object> body) {
-        // Faltaba, y era la puerta de atrás: guardar crear, editar y borrar
-        // no sirve de nada si activar y desactivar queda abierto. Por aquí
-        // un jefe de ventas podía desactivar al gerente.
-        if (soloPuedeCajeros()) {
-            String rol = userRepository.findById(id).map(User::getRole).orElse(null);
-            if (!"cajero".equals(rol)) return soloCajeros();
+        // Esta ruta faltaba, y era la puerta de atrás: guardar crear, editar
+        // y borrar no sirve de nada si activar y desactivar queda abierto.
+        // Desactivar a alguien es dejarlo fuera igual que borrarlo, así que
+        // lleva exactamente los mismos permisos que las otras tres.
+        Optional<User> found = userRepository.findById(id);
+        if (found.isEmpty()) return error(404, "Usuario no encontrado");
+        User user = found.get();
+
+        if (soloPuedeCajeros() && !"cajero".equals(user.getRole())) return soloCajeros();
+        if (!esGerente() && "superadmin".equals(user.getRole())) return soloElGerente();
+        if (esElMismo(user)) return contraTiMismo("desactivar");
+
+        if (body.get("isActive") instanceof Number n) {
+            user.setIsActive(n.intValue());
+            userRepository.save(user);
         }
-        return userRepository.findById(id).<ResponseEntity<?>>map(user -> {
-            if (body.get("isActive") instanceof Number n) {
-                user.setIsActive(n.intValue());
-                userRepository.save(user);
-            }
-            return ResponseEntity.ok(toClienteDTO(user, customerRepository.findByUserId(user.getId()).orElse(null)));
-        }).orElseGet(() -> error(404, "Usuario no encontrado"));
+        return ResponseEntity.ok(toClienteDTO(user, customerRepository.findByUserId(user.getId()).orElse(null)));
     }
 
     @DeleteMapping("/users/{id}")
     @Transactional
     public ResponseEntity<?> deleteUser(@PathVariable Integer id) {
-        if (soloPuedeCajeros()) {
-            // Sin esto, el jefe podría borrar al gerente desde la misma
-            // pantalla en la que da de alta a un cajero.
-            String rol = userRepository.findById(id).map(User::getRole).orElse(null);
-            if (!"cajero".equals(rol)) return soloCajeros();
-        }
+        Optional<User> found = userRepository.findById(id);
+        if (found.isEmpty()) return error(404, "Usuario no encontrado");
+        User user = found.get();
+
+        // Sin esto, el jefe podría borrar al gerente desde la misma pantalla
+        // en la que da de alta a un cajero.
+        if (soloPuedeCajeros() && !"cajero".equals(user.getRole())) return soloCajeros();
+        if (!esGerente() && "superadmin".equals(user.getRole())) return soloElGerente();
+        // Y el guardián del último gerente: como nadie puede borrarse a sí
+        // mismo, siempre queda al menos uno con quien arreglar lo demás.
+        if (esElMismo(user)) return contraTiMismo("borrar");
+
         customerRepository.deleteByUserId(id);
         userRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("ok", true));
