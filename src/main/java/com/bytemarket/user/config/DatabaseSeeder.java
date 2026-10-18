@@ -68,6 +68,11 @@ public class DatabaseSeeder implements CommandLineRunner {
     private void seedUsers() {
         ensureUser("Gerente de tienda", "owner@bytemarket.com", "admin123", "superadmin");
         ensureUser("Encargado de tienda", "admin@bytemarket.com", "admin123", "admin");
+        // Las dos personas del mostrador. Existen sembradas para que el
+        // flujo de caja se pueda probar sin crear usuarios a mano: el jefe
+        // abre el turno y el cajero vende en él.
+        ensureUser("Jefe de ventas", "jefe@bytemarket.com", "jefe123", "jefe_ventas");
+        ensureUser("Cajero", "cajero@bytemarket.com", "cajero123", "cajero");
     }
 
     private void seedCustomers() {

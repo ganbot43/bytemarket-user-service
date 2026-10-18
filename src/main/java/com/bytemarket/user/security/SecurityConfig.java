@@ -72,6 +72,14 @@ public class SecurityConfig {
                     "/mi-cuenta",
                     "/mi-cuenta/**"
                 ).permitAll()
+                /*
+                 * El jefe de ventas habilita a sus cajeros, así que entra a
+                 * la gestión de usuarios —pero el controlador le limita a
+                 * los de rol cajero: no puede crearse un admin ni tocar al
+                 * gerente. El permiso abre la puerta; la regla de quién
+                 * puede tocar a quién vive en ApiAdminUserController.
+                 */
+                .requestMatchers("/api/admin/users/**").hasAnyRole("JEFE_VENTAS", "ADMIN", "SUPERADMIN")
                 .requestMatchers("/admin", "/admin/**", "/api/admin/**", "/api/upload/**").hasAnyRole("ADMIN", "SUPERADMIN")
                 .anyRequest().authenticated()
             )

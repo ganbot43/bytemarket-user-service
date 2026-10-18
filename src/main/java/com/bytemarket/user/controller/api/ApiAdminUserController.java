@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,7 +33,20 @@ import static com.bytemarket.user.controller.api.ApiAccountController.limpiar;
 @RequiredArgsConstructor
 public class ApiAdminUserController {
 
-    private static final Set<String> ROLES_VALIDOS = Set.of("customer", "admin", "superadmin");
+    /**
+     * Los roles del sistema, de menos a más alcance.
+     *
+     *   cajero       vende y atiende; no cuadra ni cambia nada
+     *   jefe_ventas  da fondos, arquea, cuadra y habilita cajeros
+     *   admin        encargado de tienda: productos, pedidos, inventario
+     *   superadmin   gerente: todo, incluida la configuración
+     *
+     * Están separados porque el control interno de una caja lo exige: quien
+     * vende no cuadra, y quien cuadra no cambia precios. Con un solo rol de
+     * panel, un faltante no se puede atribuir a nadie.
+     */
+    private static final Set<String> ROLES_VALIDOS =
+            Set.of("customer", "cajero", "jefe_ventas", "admin", "superadmin");
 
     private final IUserRepository userRepository;
     private final ICustomerRepository customerRepository;
@@ -114,6 +128,28 @@ public class ApiAdminUserController {
         return ResponseEntity.ok(Map.of("data", data, "total", users.getTotalElements()));
     }
 
+    /**
+     * Si quien llama es jefe de ventas, solo puede tocar cajeros.
+     *
+     * El permiso de la ruta le deja entrar a la gestión de usuarios —tiene
+     * que poder habilitar a su gente— pero no a crearse un admin ni a
+     * desactivar al gerente. Sin esto, "habilita cajeros" sería en la
+     * práctica "habilita lo que quiera", y la separación de roles que
+     * justifica todo esto se vendría abajo.
+     */
+    private static boolean soloPuedeCajeros() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        var roles = auth.getAuthorities().stream().map(Object::toString).toList();
+        return roles.contains("ROLE_JEFE_VENTAS")
+                && !roles.contains("ROLE_ADMIN") && !roles.contains("ROLE_SUPERADMIN");
+    }
+
+    private static ResponseEntity<Map<String, Object>> soloCajeros() {
+        return ResponseEntity.status(403).body(Map.of("statusCode", 403,
+                "message", "Como jefe de ventas solo puedes gestionar cajeros."));
+    }
+
     @PostMapping("/users")
     @Transactional
     public ResponseEntity<?> createUser(@RequestBody Map<String, Object> body) {
@@ -128,6 +164,7 @@ public class ApiAdminUserController {
         }
         if (password.length() < 6) return error(400, "La contraseña debe tener al menos 6 caracteres");
         if (!ROLES_VALIDOS.contains(role)) return error(400, "Rol inválido: " + role);
+        if (soloPuedeCajeros() && !"cajero".equals(role)) return soloCajeros();
         if (userRepository.findByEmail(email).isPresent()) return error(400, "El correo ya está registrado");
         if (dni != null && customerRepository.existsByDni(dni)) return error(400, "El DNI ya está registrado");
 
@@ -164,6 +201,12 @@ public class ApiAdminUserController {
 
         String role = limpiar(body.get("role"));
         if (role != null && !ROLES_VALIDOS.contains(role)) return error(400, "Rol inválido: " + role);
+        // Se mira el rol QUE TIENE y el que se le quiere poner: lo primero
+        // impide editar a un admin, lo segundo ascender a un cajero.
+        if (soloPuedeCajeros()
+                && (!"cajero".equals(user.getRole()) || (role != null && !"cajero".equals(role)))) {
+            return soloCajeros();
+        }
 
         Customer ficha = customerRepository.findByUserId(user.getId()).orElse(null);
         String dni = null;
@@ -206,6 +249,12 @@ public class ApiAdminUserController {
     @DeleteMapping("/users/{id}")
     @Transactional
     public ResponseEntity<?> deleteUser(@PathVariable Integer id) {
+        if (soloPuedeCajeros()) {
+            // Sin esto, el jefe podría borrar al gerente desde la misma
+            // pantalla en la que da de alta a un cajero.
+            String rol = userRepository.findById(id).map(User::getRole).orElse(null);
+            if (!"cajero".equals(rol)) return soloCajeros();
+        }
         customerRepository.deleteByUserId(id);
         userRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("ok", true));
