@@ -228,6 +228,7 @@ public class ApiAdminUserController {
         user.setEmail(email);
         user.setPasswordHash(authService.hashPassword(password));
         user.setRole(role);
+        if (!"customer".equals(role)) user.setDni(dni);
         if (body.get("isActive") instanceof Number n) user.setIsActive(n.intValue());
         userRepository.save(user);
 
@@ -284,6 +285,7 @@ public class ApiAdminUserController {
         if (name != null) user.setName(name);
         if (cambiaEmail) user.setEmail(email);
         if (role != null) user.setRole(role);
+        if (body.containsKey("dni") && !"customer".equals(user.getRole())) user.setDni(dni);
         if (body.get("isActive") instanceof Number n) user.setIsActive(n.intValue());
         userRepository.save(user);
 
@@ -351,7 +353,9 @@ public class ApiAdminUserController {
         dto.put("createdAt", user.getCreatedAt());
         dto.put("profilePicture", s3Service.getPresignedUrl(user.getProfilePicture()));
         dto.put("customerId", c != null ? c.getId() : null);
-        dto.put("dni", c != null ? c.getDni() : null);
+        // La ficha manda si existe —es donde está la unicidad— y si no,
+        // el del propio usuario, que es lo que tiene la gente del panel.
+        dto.put("dni", c != null && c.getDni() != null ? c.getDni() : user.getDni());
         dto.put("phone", c != null ? c.getPhone() : null);
         dto.put("address", c != null ? c.getAddress() : null);
         dto.put("addressReference", c != null ? c.getAddressReference() : null);

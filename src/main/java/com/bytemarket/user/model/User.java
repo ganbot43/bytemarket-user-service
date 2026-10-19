@@ -34,6 +34,21 @@ public class User {
     @Column(name = "profile_picture", columnDefinition = "TEXT")
     private String profilePicture;
 
+    /**
+     * El DNI de la gente del panel.
+     *
+     * Va impreso en el ticket de apertura de caja y en el papel de caja: un
+     * papel firmado que solo dice "Cajero" no identifica a nadie cuando hay
+     * dos con el mismo nombre de pila.
+     *
+     * El de los clientes sigue en su ficha de `customers` —donde está la
+     * restricción de unicidad y el resto de sus datos de envío—, y al pasar
+     * a un rol de panel esa ficha se borra. Por eso hace falta aquí: el
+     * cajero no tiene ficha de cliente.
+     */
+    @Column(length = 20)
+    private String dni;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
