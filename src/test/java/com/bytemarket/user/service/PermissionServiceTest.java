@@ -353,6 +353,18 @@ class PermissionServiceTest {
         assertFalse(ver.get(PanelModules.CAJERO).get("reportes"), "pero no ve los números del negocio");
         assertFalse(ver.get(PanelModules.JEFE_VENTAS).get("productos"), "el catálogo es de gestión");
         assertFalse(ver.get(PanelModules.ENCARGADO).get("configuracion"), "la configuración es del gerente");
+
+        /* Lo que se escapó al heredar: "pedidos" venía del jefe, que es solo
+           ver, y el encargado sí cambia el estado de un pedido hoy. Un
+           default que quita algo que ya se hace es el peor de los errores
+           aquí, porque se descubre en producción y parece un bug nuevo. */
+        Map<String, Boolean> edita = new java.util.LinkedHashMap<>();
+        for (RolePermission f : guardadas) {
+            if (PanelModules.ENCARGADO.equals(f.getRole())) edita.put(f.getModule(), f.isCanEdit());
+        }
+        assertTrue(edita.get("pedidos"), "el encargado cambia el estado de un pedido");
+        assertTrue(edita.get("reportes"));
+        assertTrue(edita.get("inventario"));
     }
 
     @Test

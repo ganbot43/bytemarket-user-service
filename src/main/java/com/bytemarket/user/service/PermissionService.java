@@ -63,6 +63,11 @@ public class PermissionService {
 
         Map<String, Permiso> encargado = new LinkedHashMap<>(jefe);
         encargado.put("reportes", Permiso.COMPLETO);
+        /* Hereda "pedidos" del jefe, que es solo ver, y hay que subirlo:
+           cambiar el estado de un pedido cae hoy en el comodín de ADMIN de
+           order-service, así que dejarlo en ver le quitaría algo que ya
+           hace. */
+        encargado.put("pedidos", Permiso.COMPLETO);
         encargado.put("inventario", Permiso.COMPLETO);
         encargado.put("productos", Permiso.COMPLETO);
         encargado.put("categorias", Permiso.COMPLETO);
