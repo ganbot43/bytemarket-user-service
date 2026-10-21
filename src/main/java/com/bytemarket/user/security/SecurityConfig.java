@@ -27,7 +27,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthenticationFilter jwtAuthFilter,
-                                                   AuthenticationProvider authenticationProvider) throws Exception {
+                                                   AuthenticationProvider authenticationProvider,
+                                                   ModuloAuthorizationManager porModulo) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
@@ -84,28 +85,25 @@ public class SecurityConfig {
                  * support con su token de servicio para decidir sin tener los
                  * roles escritos a mano; no es para cualquiera con sesión,
                  * porque describe el reparto de poder del negocio.
-                 *
-                 * /api/admin/permissions —la pantalla de edición— no necesita
-                 * regla propia: cae en el /api/admin/** de abajo, que ya es
-                 * de encargado y gerente, y es justo quién debe entrar.
                  */
                 .requestMatchers("/api/internal/**").hasAnyRole("SERVICE", "ADMIN", "SUPERADMIN")
                 /*
-                 * La pantalla de permisos deja pasar también al jefe de
-                 * ventas, y es el controlador —no esta regla— quien decide
-                 * mirando la matriz.
+                 * Todo /api/admin lo decide la MATRIZ, no una lista de roles.
                  *
-                 * Si se quedara en ADMIN+SUPERADMIN, conceder "Roles y
-                 * permisos" a un jefe de ventas desde el panel no haría nada:
-                 * la matriz diría que sí y el filtro le daría 403. Lo
-                 * contrario también fallaba —quitárselo al encargado no le
-                 * cerraba la puerta— y las dos cosas son el mismo error:
-                 * dos sitios decidiendo lo mismo y contradiciéndose.
+                 * Antes había dos reglas hasAnyRole aquí y la consecuencia era
+                 * que la pantalla de permisos mentía: quitarle "Usuarios" al
+                 * jefe de ventas no le cerraba /api/admin/users/**, porque
+                 * mandaba el filtro y no la tabla. Con esto hay un solo sitio
+                 * que decide, y la ruta de cada módulo está en RutasDeModulo.
+                 *
+                 * El jefe de ventas entra al manager: antes esta ruta era de
+                 * encargado para arriba, así que concederle un módulo desde el
+                 * panel no habría hecho nada.
                  */
-                .requestMatchers("/api/admin/permissions")
-                    .hasAnyRole("JEFE_VENTAS", "ADMIN", "SUPERADMIN")
-                .requestMatchers("/api/admin/users/**").hasAnyRole("JEFE_VENTAS", "ADMIN", "SUPERADMIN")
-                .requestMatchers("/admin", "/admin/**", "/api/admin/**", "/api/upload/**").hasAnyRole("ADMIN", "SUPERADMIN")
+                .requestMatchers("/api/admin/**").access(porModulo)
+                /* Páginas MVC heredadas y la subida de imágenes, que no son
+                   módulos del panel: siguen por rol. */
+                .requestMatchers("/admin", "/admin/**", "/api/upload/**").hasAnyRole("ADMIN", "SUPERADMIN")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex

@@ -55,7 +55,9 @@ public class PermissionService {
         jefe.put("dashboard", Permiso.SOLO_VER);
         jefe.put("cajas", Permiso.COMPLETO);
         jefe.put("reportes", Permiso.SOLO_VER);
-        jefe.put("pedidos", Permiso.COMPLETO);
+        /* Solo ver: hoy el jefe hace GET de pedidos, pero cambiar el estado
+           de uno cae en el comodín de order-service y es de gestión. */
+        jefe.put("pedidos", Permiso.SOLO_VER);
         jefe.put("inventario", Permiso.SOLO_VER);
         jefe.put("usuarios", Permiso.COMPLETO);
 

@@ -47,10 +47,6 @@ public class ApiPermissionController {
         String rol = rolDelPanel();
         if (rol == null) return error(403, "No es una sesión de panel.");
 
-        if (!puede(rol, false)) {
-            return error(403, "No tienes el módulo de roles y permisos.");
-        }
-
         List<String> editables = PanelModules.editablesPor(rol);
         if (editables.isEmpty()) {
             return error(403, "Tu rol no administra permisos de nadie.");
@@ -88,10 +84,6 @@ public class ApiPermissionController {
     public ResponseEntity<?> guardar(@RequestBody Map<String, Object> body) {
         String rol = rolDelPanel();
         if (rol == null) return error(403, "No es una sesión de panel.");
-        if (!puede(rol, true)) {
-            return error(403, "No tienes permiso para editar roles y permisos.");
-        }
-
         Map<String, Map<String, Permiso>> cambios = new LinkedHashMap<>();
         for (var e : body.entrySet()) {
             if (!(e.getValue() instanceof Map<?, ?> modulos)) continue;
@@ -166,23 +158,13 @@ public class ApiPermissionController {
         return null;
     }
 
-    /**
-     * Si quien pregunta tiene el módulo "roles" en la matriz.
-     *
-     * Hay que mirarlo aquí y no confiar en el SecurityConfig: su regla
-     * /api/admin/** deja entrar a cualquier encargado, así que si el gerente
-     * le quitaba "Roles y permisos" el encargado seguía pudiendo llamar a
-     * este PUT. El módulo que gobierna la matriz era decorativo justo para
-     * quien más importaba.
-     *
-     * El gerente no se consulta: lo tiene todo por código.
+    /*
+     * El módulo "roles" no se comprueba aquí: lo hace
+     * ModuloAuthorizationManager para toda la ruta /api/admin/**, con GET
+     * pidiendo ver y el PUT pidiendo editar. Tenerlo también en el
+     * controlador sería la misma regla en dos sitios, que es justo lo que
+     * este cambio vino a quitar.
      */
-    private boolean puede(String rol, boolean paraEditar) {
-        if (PanelModules.esGerente(rol)) return true;
-        Permiso p = permissionService.efectivos(rol).get("roles");
-        if (p == null) return false;
-        return paraEditar ? p.editar() : p.ver();
-    }
 
     private static boolean esSi(Object v) {
         if (v instanceof Boolean b) return b;
