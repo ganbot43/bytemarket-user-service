@@ -53,8 +53,15 @@ public class ApiPermissionController {
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
+        /* Las acciones y su explicación viajan con la matriz para que la
+           pantalla no tenga que repetirlas: si mañana se añade una, aparece
+           sola en la cabecera de la tabla. */
+        out.put("actions", PanelModules.ACCIONES);
+        out.put("groups", PanelModules.GRUPOS);
         out.put("modules", PanelModules.ORDEN_MODULOS.stream()
-                .map(k -> Map.of("key", k, "label", PanelModules.MODULOS.get(k)))
+                .map(k -> Map.of("key", k,
+                        "label", PanelModules.MODULOS.get(k),
+                        "group", PanelModules.grupoDe(k)))
                 .toList());
         out.put("roles", PanelModules.ROLES_CONFIGURABLES.stream()
                 .map(r -> Map.of(
@@ -91,7 +98,8 @@ public class ApiPermissionController {
             for (var m : modulos.entrySet()) {
                 if (!(m.getValue() instanceof Map<?, ?> flags)) continue;
                 porModulo.put(String.valueOf(m.getKey()), new Permiso(
-                        esSi(flags.get("view")), esSi(flags.get("edit"))));
+                        esSi(flags.get("view")), esSi(flags.get("create")),
+                        esSi(flags.get("edit")), esSi(flags.get("delete"))));
             }
             cambios.put(e.getKey(), porModulo);
         }
@@ -173,8 +181,9 @@ public class ApiPermissionController {
 
     private static Map<String, Object> permisosDTO(Map<String, Permiso> permisos) {
         Map<String, Object> out = new LinkedHashMap<>();
-        permisos.forEach((modulo, p) ->
-                out.put(modulo, Map.of("view", p.ver(), "edit", p.editar())));
+        permisos.forEach((modulo, p) -> out.put(modulo, Map.of(
+                "view", p.ver(), "create", p.crear(),
+                "edit", p.editar(), "delete", p.eliminar())));
         return out;
     }
 

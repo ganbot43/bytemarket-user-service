@@ -17,9 +17,10 @@ import lombok.Data;
  * mal hecho podría dejarlo fuera de su propio sistema sin forma de volver a
  * entrar.
  *
- * Ver y editar van separados porque hay permisos que ya existen así: el jefe
- * de ventas consulta el inventario para cuadrar, pero dar de alta un
- * movimiento es de quien reabastece.
+ * Las cuatro acciones van separadas porque el negocio las separa: el jefe de
+ * ventas consulta el inventario para cuadrar pero no lo mueve, y "registra
+ * una orden pero no la borra" es una frase que tiene que poder expresarse.
+ * Con solo ver y editar, crear y eliminar caían en el mismo saco.
  */
 @Data
 @Entity
@@ -43,6 +44,12 @@ public class RolePermission {
     @Column(name = "can_view", nullable = false)
     private boolean canView;
 
+    @Column(name = "can_create", nullable = false)
+    private boolean canCreate;
+
     @Column(name = "can_edit", nullable = false)
     private boolean canEdit;
+
+    @Column(name = "can_delete", nullable = false)
+    private boolean canDelete;
 }

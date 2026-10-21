@@ -95,21 +95,54 @@ class ModuloAuthorizationManagerTest {
         assertFalse(permite(PanelModules.CAJERO, "GET", "/api/admin/users"));
     }
 
+    /** Una fila con las cuatro acciones a medida. */
+    private void conPermiso(String rol, String modulo, boolean ver, boolean crear,
+                            boolean editar, boolean eliminar) {
+        RolePermission f = new RolePermission();
+        f.setRole(rol);
+        f.setModule(modulo);
+        f.setCanView(ver);
+        f.setCanCreate(crear);
+        f.setCanEdit(editar);
+        f.setCanDelete(eliminar);
+        when(repository.findByRole(rol)).thenReturn(List.of(f));
+    }
+
     @Test
-    @DisplayName("ver no alcanza para escribir: el método decide cuál de los dos permisos hace falta")
-    void elMetodoDecideQuePermisoHaceFalta() {
-        // Al cajero se le concede solo VER usuarios. El GET pasa, el POST no.
-        RolePermission soloVer = new RolePermission();
-        soloVer.setRole(PanelModules.CAJERO);
-        soloVer.setModule("usuarios");
-        soloVer.setCanView(true);
-        soloVer.setCanEdit(false);
-        when(repository.findByRole(PanelModules.CAJERO)).thenReturn(List.of(soloVer));
+    @DisplayName("ver no alcanza para escribir: el verbo decide qué acción hace falta")
+    void elMetodoDecideQueAccionHaceFalta() {
+        conPermiso(PanelModules.CAJERO, "usuarios", true, false, false, false);
 
         assertTrue(permite(PanelModules.CAJERO, "GET", "/api/admin/users"));
         assertFalse(permite(PanelModules.CAJERO, "POST", "/api/admin/users"),
                 "con solo ver no se puede dar de alta a nadie");
         assertFalse(permite(PanelModules.CAJERO, "DELETE", "/api/admin/users/3"));
+    }
+
+    @Test
+    @DisplayName("las cuatro acciones se reparten por separado")
+    void lasCuatroAccionesSonIndependientes() {
+        /* Lo que antes era inexpresable: "registra usuarios y los corrige,
+           pero no da de baja a nadie". Con solo ver y editar, crear y
+           eliminar caían en el mismo saco y había que conceder las dos o
+           ninguna. */
+        conPermiso(PanelModules.JEFE_VENTAS, "usuarios", true, true, true, false);
+
+        assertTrue(permite(PanelModules.JEFE_VENTAS, "GET", "/api/admin/users"), "consulta");
+        assertTrue(permite(PanelModules.JEFE_VENTAS, "POST", "/api/admin/users"), "da de alta");
+        assertTrue(permite(PanelModules.JEFE_VENTAS, "PUT", "/api/admin/users/3"), "corrige");
+        assertFalse(permite(PanelModules.JEFE_VENTAS, "DELETE", "/api/admin/users/3"),
+                "pero no da de baja");
+    }
+
+    @Test
+    @DisplayName("crear sin editar también se puede: dar de alta no es poder cambiar lo ajeno")
+    void crearSinEditar() {
+        conPermiso(PanelModules.CAJERO, "usuarios", true, true, false, false);
+
+        assertTrue(permite(PanelModules.CAJERO, "POST", "/api/admin/users"));
+        assertFalse(permite(PanelModules.CAJERO, "PUT", "/api/admin/users/3"));
+        assertFalse(permite(PanelModules.CAJERO, "PATCH", "/api/admin/users/3"));
     }
 
     @Test

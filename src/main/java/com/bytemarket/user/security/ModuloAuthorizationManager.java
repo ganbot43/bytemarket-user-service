@@ -49,10 +49,17 @@ public class ModuloAuthorizationManager implements AuthorizationManager<RequestA
         var permiso = permissionService.efectivos(rol).get(modulo);
         if (permiso == null) return new AuthorizationDecision(false);
 
-        boolean ok = RutasDeModulo.escribe(context.getRequest())
-                ? permiso.editar()
-                : permiso.ver();
-        return new AuthorizationDecision(ok);
+        return new AuthorizationDecision(
+                concede(permiso, RutasDeModulo.accion(context.getRequest())));
+    }
+
+    private static boolean concede(PermissionService.Permiso p, String accion) {
+        return switch (accion) {
+            case "create" -> p.crear();
+            case "edit" -> p.editar();
+            case "delete" -> p.eliminar();
+            default -> p.ver();
+        };
     }
 
     /** El más alto de la pirámide que traiga la sesión. */

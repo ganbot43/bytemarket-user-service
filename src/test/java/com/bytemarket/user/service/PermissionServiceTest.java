@@ -77,7 +77,7 @@ class PermissionServiceTest {
     @DisplayName("el encargado no puede editarse a sí mismo")
     void nadieSeEditaASiMismo() {
         var r = servicio.guardar(PanelModules.ENCARGADO,
-                cambio(PanelModules.ENCARGADO, "configuracion", new Permiso(true, true)));
+                cambio(PanelModules.ENCARGADO, "configuracion", new Permiso(true, true, true, true)));
 
         assertEquals(0, r.aplicados(), "no debió guardar nada");
         assertTrue(guardadas.isEmpty());
@@ -88,7 +88,7 @@ class PermissionServiceTest {
     @DisplayName("el jefe de ventas no puede ampliar al encargado, que está por encima")
     void noSePuedeEditarHaciaArriba() {
         var r = servicio.guardar(PanelModules.JEFE_VENTAS,
-                cambio(PanelModules.ENCARGADO, "reportes", new Permiso(false, false)));
+                cambio(PanelModules.ENCARGADO, "reportes", new Permiso(false, false, false, false)));
 
         assertEquals(0, r.aplicados());
         assertTrue(guardadas.isEmpty());
@@ -100,7 +100,7 @@ class PermissionServiceTest {
         // Ni siquiera él mismo: no es una cuestión de permisos sino de que
         // sus permisos no viven en la tabla.
         var r = servicio.guardar(PanelModules.GERENTE,
-                cambio(PanelModules.GERENTE, "caja", new Permiso(false, false)));
+                cambio(PanelModules.GERENTE, "caja", new Permiso(false, false, false, false)));
 
         assertEquals(0, r.aplicados());
         assertTrue(guardadas.isEmpty());
@@ -127,7 +127,7 @@ class PermissionServiceTest {
 
         conLosPermisosPorDefecto();
         var r = servicio.guardar(PanelModules.ENCARGADO,
-                cambio(PanelModules.CAJERO, "reportes", new Permiso(true, false)));
+                cambio(PanelModules.CAJERO, "reportes", new Permiso(true, false, false, false)));
 
         assertEquals(1, r.aplicados());
         assertTrue(r.rechazos().isEmpty());
@@ -171,12 +171,14 @@ class PermissionServiceTest {
     @DisplayName("conceder editar implica ver: lo contrario es un permiso inalcanzable")
     void editarImplicaVer() {
         servicio.guardar(PanelModules.GERENTE,
-                cambio(PanelModules.CAJERO, "inventario", new Permiso(false, true)));
+                cambio(PanelModules.CAJERO, "inventario", new Permiso(true, true, true, true)));
 
         assertEquals(1, guardadas.size());
         assertTrue(guardadas.get(0).isCanView(),
                 "sin ver no se abre la pantalla, así que el editar no se podría usar");
         assertTrue(guardadas.get(0).isCanEdit());
+        assertTrue(guardadas.get(0).isCanCreate(), "conceder todo incluye crear");
+        assertTrue(guardadas.get(0).isCanDelete(), "y eliminar");
     }
 
     @Test
@@ -187,8 +189,8 @@ class PermissionServiceTest {
         // sin que nadie se enterara de cuál era el malo.
         conLosPermisosPorDefecto();
         var r = servicio.guardar(PanelModules.ENCARGADO, Map.of(
-                PanelModules.CAJERO, Map.of("pedidos", new Permiso(true, false)),
-                PanelModules.ENCARGADO, Map.of("configuracion", new Permiso(true, true))));
+                PanelModules.CAJERO, Map.of("pedidos", new Permiso(true, false, false, false)),
+                PanelModules.ENCARGADO, Map.of("configuracion", new Permiso(true, true, true, true))));
 
         assertEquals(1, r.aplicados(), "el del cajero sí se aplica");
         assertEquals(1, r.rechazos().size(), "el propio se rechaza");
@@ -209,7 +211,7 @@ class PermissionServiceTest {
            teniendo lo que nunca tuvo. La pirámide aguanta y el privilegio
            se escapa por abajo. */
         var r = servicio.guardar(PanelModules.ENCARGADO,
-                cambio(PanelModules.CAJERO, "configuracion", new Permiso(true, true)));
+                cambio(PanelModules.CAJERO, "configuracion", new Permiso(true, true, true, true)));
 
         assertEquals(0, r.aplicados(), "no debe poder concederlo");
         assertTrue(guardadas.isEmpty());
@@ -225,7 +227,7 @@ class PermissionServiceTest {
         // encargado tiene que poder cerrarle una pantalla a un cajero sin
         // necesitar antes ese mismo permiso.
         var r = servicio.guardar(PanelModules.ENCARGADO,
-                cambio(PanelModules.CAJERO, "configuracion", new Permiso(false, false)));
+                cambio(PanelModules.CAJERO, "configuracion", new Permiso(false, false, false, false)));
 
         assertEquals(1, r.aplicados());
         assertFalse(guardadas.get(0).isCanView());
@@ -238,10 +240,12 @@ class PermissionServiceTest {
         conLosPermisosPorDefecto();
 
         var r = servicio.guardar(PanelModules.GERENTE,
-                cambio(PanelModules.CAJERO, "configuracion", new Permiso(true, true)));
+                cambio(PanelModules.CAJERO, "configuracion", new Permiso(true, true, true, true)));
 
         assertEquals(1, r.aplicados());
         assertTrue(guardadas.get(0).isCanEdit());
+        assertTrue(guardadas.get(0).isCanCreate(), "conceder todo incluye crear");
+        assertTrue(guardadas.get(0).isCanDelete(), "y eliminar");
     }
 
     @Test
@@ -251,7 +255,7 @@ class PermissionServiceTest {
 
         // El jefe no tiene Productos; el cajero tampoco debe acabar con él.
         var r = servicio.guardar(PanelModules.JEFE_VENTAS,
-                cambio(PanelModules.CAJERO, "productos", new Permiso(true, true)));
+                cambio(PanelModules.CAJERO, "productos", new Permiso(true, true, true, true)));
 
         assertEquals(0, r.aplicados());
         assertTrue(guardadas.isEmpty());
@@ -278,7 +282,7 @@ class PermissionServiceTest {
                 .thenReturn(Optional.of(delCajero));
 
         servicio.guardar(PanelModules.GERENTE,
-                cambio(PanelModules.ENCARGADO, "reportes", new Permiso(false, false)));
+                cambio(PanelModules.ENCARGADO, "reportes", new Permiso(false, false, false, false)));
 
         assertFalse(delCajero.isCanView(),
                 "al cajero también se le cierra: si no, el encargado lo recupera por abajo");
@@ -300,7 +304,7 @@ class PermissionServiceTest {
 
         // El encargado conserva el ver, así que el cajero también puede.
         servicio.guardar(PanelModules.GERENTE,
-                cambio(PanelModules.ENCARGADO, "pedidos", new Permiso(true, false)));
+                cambio(PanelModules.ENCARGADO, "pedidos", new Permiso(true, false, false, false)));
 
         assertTrue(delCajero.isCanView(), "el ver no se tocó arriba, no se toca abajo");
         assertFalse(delCajero.isCanEdit(), "el editar sí");
@@ -320,7 +324,7 @@ class PermissionServiceTest {
                 .thenReturn(Optional.of(delCajero));
 
         servicio.guardar(PanelModules.GERENTE,
-                cambio(PanelModules.ENCARGADO, "configuracion", new Permiso(true, true)));
+                cambio(PanelModules.ENCARGADO, "configuracion", new Permiso(true, true, true, true)));
 
         assertFalse(delCajero.isCanView(),
                 "para eso está la pantalla; conceder en cadena daría permisos que nadie pidió");

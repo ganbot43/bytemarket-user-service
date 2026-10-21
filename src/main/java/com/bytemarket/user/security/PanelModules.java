@@ -89,6 +89,60 @@ public final class PanelModules {
             "resenas", "reclamaciones", "usuarios", "metodos_pago",
             "configuracion", "roles");
 
+    // ── Acciones y agrupación ────────────────────────────────────
+
+    /**
+     * Las cuatro acciones, en el orden en que se leen, con su explicación.
+     *
+     * Viajan al panel en vez de estar escritas en la pantalla: la cabecera de
+     * la tabla se dibuja desde aquí, así que añadir una acción mañana no pide
+     * tocar el front. La ayuda importa porque "Editar" y "Crear" se confunden
+     * cuando se reparten de corrido.
+     */
+    public static final List<Map<String, String>> ACCIONES = List.of(
+            Map.of("key", "view", "label", "Ver",
+                    "help", "Entrar al módulo y consultarlo"),
+            Map.of("key", "create", "label", "Crear",
+                    "help", "Dar de alta registros nuevos"),
+            Map.of("key", "edit", "label", "Editar",
+                    "help", "Modificar lo que ya existe"),
+            Map.of("key", "delete", "label", "Eliminar",
+                    "help", "Dar de baja registros"));
+
+    /**
+     * Cómo se agrupan los módulos en la pantalla.
+     *
+     * Por el mismo motivo por el que se agrupan en el menú: diecisiete filas
+     * seguidas obligan a buscar "Subcategorías" entre "Reseñas" y "Usuarios"
+     * cada vez. Agrupados como la navegación —que es la organización que
+     * quien administra ya tiene en la cabeza— cada bloque se abre, se
+     * resuelve y se cierra.
+     */
+    public static final List<String> GRUPOS = List.of("Operación", "Tienda", "Sistema");
+
+    private static final Map<String, String> GRUPO_DE_MODULO = Map.ofEntries(
+            Map.entry("dashboard", "Operación"),
+            Map.entry("caja", "Operación"),
+            Map.entry("cajas", "Operación"),
+            Map.entry("pedidos", "Operación"),
+            Map.entry("reportes", "Operación"),
+            Map.entry("inventario", "Operación"),
+            Map.entry("productos", "Tienda"),
+            Map.entry("categorias", "Tienda"),
+            Map.entry("subcategorias", "Tienda"),
+            Map.entry("banners", "Tienda"),
+            Map.entry("cupones", "Tienda"),
+            Map.entry("resenas", "Tienda"),
+            Map.entry("reclamaciones", "Tienda"),
+            Map.entry("usuarios", "Sistema"),
+            Map.entry("roles", "Sistema"),
+            Map.entry("metodos_pago", "Sistema"),
+            Map.entry("configuracion", "Sistema"));
+
+    public static String grupoDe(String modulo) {
+        return GRUPO_DE_MODULO.getOrDefault(modulo, "Sistema");
+    }
+
     // ── Jerarquía ────────────────────────────────────────────────
 
     /** Nivel en la pirámide; -1 si no es un rol de panel (p. ej. customer). */
