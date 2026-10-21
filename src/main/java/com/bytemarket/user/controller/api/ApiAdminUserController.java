@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import com.bytemarket.user.security.PanelModules;
+import com.bytemarket.user.security.RolDeLaSesion;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -175,11 +176,7 @@ public class ApiAdminUserController {
 
     /** El rol de panel del llamante, o null si no trae ninguno. */
     private static String rolDelLlamante() {
-        for (String rol : List.of(PanelModules.GERENTE, PanelModules.ENCARGADO,
-                PanelModules.JEFE_VENTAS, PanelModules.CAJERO)) {
-            if (tieneRol(rol.toUpperCase())) return rol;
-        }
-        return null;
+        return RolDeLaSesion.actual();
     }
 
     /**
@@ -235,9 +232,7 @@ public class ApiAdminUserController {
     }
 
     private static boolean tieneRol(String rol) {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) return false;
-        return auth.getAuthorities().stream().map(Object::toString).anyMatch(("ROLE_" + rol)::equals);
+        return RolDeLaSesion.tieneRol(rol);
     }
 
     /**

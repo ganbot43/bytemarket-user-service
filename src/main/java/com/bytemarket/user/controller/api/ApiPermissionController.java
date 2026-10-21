@@ -148,23 +148,11 @@ public class ApiPermissionController {
 
     // ── Auxiliares ───────────────────────────────────────────────
 
-    /**
-     * El rol de panel de quien hace la petición, sacado de las authorities.
-     *
-     * Se recorre la pirámide de arriba abajo y se devuelve el primero que
-     * encaja: si una sesión trajera dos roles, quedarse con el más alto es lo
-     * único coherente con una jerarquía.
-     */
+    /** El puesto de quien pregunta; la deducción vive en RolDeLaSesion. */
     private static String rolDelPanel() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) return null;
-        List<String> authorities = auth.getAuthorities().stream().map(Object::toString).toList();
-        for (String rol : List.of(PanelModules.GERENTE, PanelModules.ENCARGADO,
-                PanelModules.JEFE_VENTAS, PanelModules.CAJERO)) {
-            if (authorities.contains("ROLE_" + rol.toUpperCase())) return rol;
-        }
-        return null;
+        return com.bytemarket.user.security.RolDeLaSesion.actual();
     }
+
 
     /*
      * El módulo "roles" no se comprueba aquí: lo hace

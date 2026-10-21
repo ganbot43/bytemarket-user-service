@@ -37,7 +37,7 @@ public class ModuloAuthorizationManager implements AuthorizationManager<RequestA
         Authentication auth = authentication.get();
         if (auth == null || !auth.isAuthenticated()) return new AuthorizationDecision(false);
 
-        String rol = rolDelPanel(auth);
+        String rol = RolDeLaSesion.deAuth(auth);
         if (rol == null) return new AuthorizationDecision(false);
 
         // El gerente lo puede todo por código, no por datos.
@@ -62,13 +62,4 @@ public class ModuloAuthorizationManager implements AuthorizationManager<RequestA
         };
     }
 
-    /** El más alto de la pirámide que traiga la sesión. */
-    private static String rolDelPanel(Authentication auth) {
-        List<String> authorities = auth.getAuthorities().stream().map(Object::toString).toList();
-        for (String rol : List.of(PanelModules.GERENTE, PanelModules.ENCARGADO,
-                PanelModules.JEFE_VENTAS, PanelModules.CAJERO)) {
-            if (authorities.contains("ROLE_" + rol.toUpperCase())) return rol;
-        }
-        return null;
-    }
 }
