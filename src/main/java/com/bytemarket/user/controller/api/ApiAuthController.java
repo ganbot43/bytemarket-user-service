@@ -53,7 +53,7 @@ public class ApiAuthController {
             }
 
             // Generamos el token JWT
-            String token = jwtUtils.generateToken(user.getEmail(), user.getId(), user.getRole());
+            String token = jwtUtils.generateToken(user.getEmail(), user.getId(), user.getRole(), user.getName());
 
             // Configurar Cookie
             jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("jwt_token", token);

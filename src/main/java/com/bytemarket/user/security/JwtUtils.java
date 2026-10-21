@@ -27,13 +27,19 @@ public class JwtUtils {
     }
 
     /**
-     * Token con id y rol del usuario: los demás microservicios (catálogo,
-     * pedidos, soporte) los leen del JWT sin consultar la base de usuarios.
+     * Token con id, rol y nombre del usuario: los demás microservicios
+     * (catálogo, pedidos, soporte) los leen del JWT sin consultar la base de
+     * usuarios.
+     *
+     * El nombre va aquí porque catalog necesita firmar el kardex con quién
+     * hizo cada movimiento, y pedírselo a user-service al leer ataría una
+     * pantalla de consulta a que ese servicio esté arriba.
      */
-    public String generateToken(String email, Integer uid, String role) {
+    public String generateToken(String email, Integer uid, String role, String name) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("uid", uid);
         claims.put("role", role);
+        claims.put("name", name);
         return createToken(claims, email);
     }
 
