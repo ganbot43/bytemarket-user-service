@@ -56,6 +56,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        /*
+         * Token de servicio, no de persona.
+         *
+         * Lo firman los otros microservicios para leer la matriz de permisos,
+         * con el mismo secreto compartido y rol SERVICE (ver
+         * ServiceTokenProvider en order-service). Su subject es el nombre del
+         * servicio y no un correo, así que buscarlo en la tabla de usuarios no
+         * encontraría nada y la llamada moriría en un 403 sin explicación.
+         *
+         * Se autentica desde el claim, sin tocar la base. La firma ya quedó
+         * verificada arriba: extractUsername parsea el token con la clave, y
+         * un token manipulado habría salido por el catch.
+         */
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null
+                && esTokenDeServicio(jwt)) {
+            var authToken = new UsernamePasswordAuthenticationToken(
+                    userEmail, null,
+                    java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SERVICE")));
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
@@ -83,5 +107,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean esTokenDeServicio(String jwt) {
+        try {
+            return "SERVICE".equals(jwtUtils.extractClaim(jwt, c -> c.get("role", String.class)));
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

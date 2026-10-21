@@ -29,6 +29,8 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     private final PasswordEncoder passwordEncoder;
 
+    private final com.bytemarket.user.service.PermissionService permissionService;
+
     @Override
     public void run(String... args) {
         System.out.println("🌱 Iniciando seed de ByteMarket (user-service)...");
@@ -36,6 +38,11 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedUsers();
         seedCustomers();
         seedBusinessConfig();
+        /* Crea las filas que falten con los valores por defecto, que son los
+           mismos permisos que antes estaban escritos a mano. No pisa lo que
+           el gerente haya configurado, así que puede correr en cada
+           arranque. */
+        permissionService.sembrar();
         System.out.println("✅ Seed de user-service completado.");
     }
 
