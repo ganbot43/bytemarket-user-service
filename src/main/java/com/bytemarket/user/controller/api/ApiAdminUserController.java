@@ -47,8 +47,21 @@ public class ApiAdminUserController {
      * vende no cuadra, y quien cuadra no cambia precios. Con un solo rol de
      * panel, un faltante no se puede atribuir a nadie.
      */
-    private static final Set<String> ROLES_VALIDOS =
-            Set.of("customer", "cajero", "jefe_ventas", "admin", "superadmin");
+    /**
+     * Los roles que se pueden asignar: los puestos que haya en la tabla, más
+     * "customer", que no es un puesto de panel sino el cliente de la tienda.
+     *
+     * Estaba escrito a mano con los cinco de siempre, y eso convertía los
+     * puestos en tabla en una promesa vacía: el gerente podía crear "jefe de
+     * almacén" y al asignárselo a alguien esto respondía "Rol inválido". La
+     * mitad del sistema lo reconocía y la otra no.
+     */
+    private java.util.Set<String> rolesValidos() {
+        var out = new java.util.LinkedHashSet<String>();
+        out.add("customer");
+        out.addAll(catalogo.deMayorAMenor());
+        return out;
+    }
 
     private final IUserRepository userRepository;
     private final ICustomerRepository customerRepository;
@@ -57,6 +70,8 @@ public class ApiAdminUserController {
     private final S3Service s3Service;
 
     private final com.bytemarket.user.service.PermissionService permissionService;
+
+    private final com.bytemarket.user.service.PanelCatalogo catalogo;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -124,7 +139,7 @@ public class ApiAdminUserController {
 
         List<String> roles = Arrays.stream(role.split(","))
                 .map(String::trim).filter(r -> !r.isBlank())
-                .filter(ROLES_VALIDOS::contains)
+                .filter(rolesValidos()::contains)
                 .toList();
         if (roles.isEmpty()) return error(400, "Rol inválido: " + role);
 
@@ -164,13 +179,13 @@ public class ApiAdminUserController {
      * siendo de la gestión de tienda: el jefe de ventas no los tocaba antes
      * y no los toca ahora.
      */
-    private static boolean puedeAdministrar(String rolDestino) {
+    private boolean puedeAdministrar(String rolDestino) {
         if (esGerente() || tieneRol("ADMIN")) return true;
 
         int mio = nivelDelLlamante();
         if (mio < 0) return false;
         // Los clientes no están en la pirámide del personal.
-        int suyo = PanelModules.nivel(rolDestino);
+        int suyo = catalogo.nivel(rolDestino);
         return suyo >= 0 && mio > suyo;
     }
 
@@ -199,14 +214,14 @@ public class ApiAdminUserController {
     }
 
     /** Nivel del llamante en la pirámide; -1 si no trae rol de panel. */
-    private static int nivelDelLlamante() {
+    private int nivelDelLlamante() {
         String rol = rolDelLlamante();
-        return rol == null ? -1 : PanelModules.nivel(rol);
+        return rol == null ? -1 : catalogo.nivel(rol);
     }
 
     /** Los roles que este llamante puede administrar, para filtrar listados. */
-    private static List<String> administrables() {
-        return ROLES_VALIDOS.stream().filter(ApiAdminUserController::puedeAdministrar).toList();
+    private List<String> administrables() {
+        return rolesValidos().stream().filter(this::puedeAdministrar).toList();
     }
 
     /**
@@ -217,10 +232,10 @@ public class ApiAdminUserController {
      * escrito para el jefe porque era el único caso posible; ahora se compone,
      * y sigue nombrando el puesto.
      */
-    private static ResponseEntity<Map<String, Object>> noAdministras() {
+    private ResponseEntity<Map<String, Object>> noAdministras() {
         String rol = rolDelLlamante();
         String etiqueta = rol == null ? "tu puesto"
-                : "como " + PanelModules.ETIQUETA_ROL.getOrDefault(rol, rol).toLowerCase();
+                : "como " + catalogo.etiquetaDeRol(rol).toLowerCase();
         String mensaje = administrables().isEmpty()
                 ? capitalizar(etiqueta) + " no administras a nadie."
                 : capitalizar(etiqueta) + " solo administras a quienes están por debajo de tu puesto.";
@@ -295,7 +310,7 @@ public class ApiAdminUserController {
             return error(400, "Nombre, correo y contraseña son obligatorios");
         }
         if (password.length() < 6) return error(400, "La contraseña debe tener al menos 6 caracteres");
-        if (!ROLES_VALIDOS.contains(role)) return error(400, "Rol inválido: " + role);
+        if (!rolesValidos().contains(role)) return error(400, "Rol inválido: " + role);
         if (!puedeAdministrar(role)) return noAdministras();
         if ("superadmin".equals(role) && !esGerente()) return soloElGerente();
         if (userRepository.findByEmail(email).isPresent()) return error(400, "El correo ya está registrado");
@@ -334,7 +349,7 @@ public class ApiAdminUserController {
         if (cambiaEmail && userRepository.findByEmail(email).isPresent()) return error(400, "El correo ya está registrado");
 
         String role = limpiar(body.get("role"));
-        if (role != null && !ROLES_VALIDOS.contains(role)) return error(400, "Rol inválido: " + role);
+        if (role != null && !rolesValidos().contains(role)) return error(400, "Rol inválido: " + role);
         // Se mira el rol QUE TIENE y el que se le quiere poner: lo primero
         // impide editar a un admin, lo segundo ascender a un cajero.
         if (!puedeAdministrar(user.getRole()) || (role != null && !puedeAdministrar(role))) {

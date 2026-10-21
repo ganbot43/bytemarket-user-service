@@ -47,7 +47,7 @@ class PermissionServiceTest {
             return i.getArgument(0);
         });
 
-        servicio = new PermissionService(repository);
+        servicio = new PermissionService(repository, CatalogoDePrueba.deFabrica());
     }
 
     private Map<String, Map<String, Permiso>> cambio(String rol, String modulo, Permiso p) {
@@ -65,7 +65,7 @@ class PermissionServiceTest {
         servicio.sembrar();
         List<RolePermission> sembradas = List.copyOf(guardadas);
         guardadas.clear();
-        for (String rol : PanelModules.ROLES_CONFIGURABLES) {
+        for (String rol : CatalogoDePrueba.deFabrica().rolesConfigurables()) {
             when(repository.findByRole(rol)).thenReturn(
                     sembradas.stream().filter(f -> rol.equals(f.getRole())).toList());
         }
@@ -111,19 +111,19 @@ class PermissionServiceTest {
     @Test
     @DisplayName("el gerente reparte a los tres de abajo")
     void elGerenteEditaATodosLosDemas() {
-        for (String rol : PanelModules.ROLES_CONFIGURABLES) {
-            assertTrue(PanelModules.puedeEditar(PanelModules.GERENTE, rol),
+        for (String rol : CatalogoDePrueba.deFabrica().rolesConfigurables()) {
+            assertTrue(CatalogoDePrueba.deFabrica().puedeEditar(PanelModules.GERENTE, rol),
                     "el gerente debe poder editar a " + rol);
         }
         assertEquals(List.of(PanelModules.CAJERO, PanelModules.JEFE_VENTAS, PanelModules.ENCARGADO),
-                PanelModules.editablesPor(PanelModules.GERENTE));
+                CatalogoDePrueba.deFabrica().editablesPor(PanelModules.GERENTE));
     }
 
     @Test
     @DisplayName("el encargado reparte a jefe de ventas y cajero, y a nadie más")
     void elEncargadoEditaSoloHaciaAbajo() {
         assertEquals(List.of(PanelModules.CAJERO, PanelModules.JEFE_VENTAS),
-                PanelModules.editablesPor(PanelModules.ENCARGADO));
+                CatalogoDePrueba.deFabrica().editablesPor(PanelModules.ENCARGADO));
 
         conLosPermisosPorDefecto();
         var r = servicio.guardar(PanelModules.ENCARGADO,
@@ -138,7 +138,7 @@ class PermissionServiceTest {
     @Test
     @DisplayName("el cajero está al fondo: no reparte nada")
     void elCajeroNoEditaANadie() {
-        assertTrue(PanelModules.editablesPor(PanelModules.CAJERO).isEmpty());
+        assertTrue(CatalogoDePrueba.deFabrica().editablesPor(PanelModules.CAJERO).isEmpty());
     }
 
     // ── El gerente lo puede todo, por código ─────────────────────
@@ -158,7 +158,7 @@ class PermissionServiceTest {
 
         Map<String, Permiso> suyos = servicio.efectivos(PanelModules.GERENTE);
 
-        assertEquals(PanelModules.ORDEN_MODULOS.size(), suyos.size());
+        assertEquals(CatalogoDePrueba.deFabrica().ordenDeModulos().size(), suyos.size());
         suyos.forEach((modulo, p) -> {
             assertTrue(p.ver(), modulo + ": el gerente debe poder verlo");
             assertTrue(p.editar(), modulo + ": el gerente debe poder editarlo");
@@ -343,7 +343,7 @@ class PermissionServiceTest {
                .put(f.getModule(), f.isCanView());
         }
 
-        for (String modulo : PanelModules.ORDEN_MODULOS) {
+        for (String modulo : CatalogoDePrueba.deFabrica().ordenDeModulos()) {
             boolean cajero = ver.get(PanelModules.CAJERO).get(modulo);
             boolean jefe = ver.get(PanelModules.JEFE_VENTAS).get(modulo);
             boolean encargado = ver.get(PanelModules.ENCARGADO).get(modulo);

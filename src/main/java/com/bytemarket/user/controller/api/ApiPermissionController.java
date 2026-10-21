@@ -31,6 +31,8 @@ public class ApiPermissionController {
 
     private final PermissionService permissionService;
 
+    private final com.bytemarket.user.service.PanelCatalogo catalogo;
+
     // ── La pantalla de edición ───────────────────────────────────
 
     /**
@@ -47,7 +49,7 @@ public class ApiPermissionController {
         String rol = rolDelPanel();
         if (rol == null) return error(403, "No es una sesión de panel.");
 
-        List<String> editables = PanelModules.editablesPor(rol);
+        List<String> editables = catalogo.editablesPor(rol);
         if (editables.isEmpty()) {
             return error(403, "Tu rol no administra permisos de nadie.");
         }
@@ -57,22 +59,22 @@ public class ApiPermissionController {
            pantalla no tenga que repetirlas: si mañana se añade una, aparece
            sola en la cabecera de la tabla. */
         out.put("actions", PanelModules.ACCIONES);
-        out.put("groups", PanelModules.GRUPOS);
-        out.put("modules", PanelModules.ORDEN_MODULOS.stream()
+        out.put("groups", catalogo.grupos());
+        out.put("modules", catalogo.ordenDeModulos().stream()
                 .map(k -> Map.of("key", k,
-                        "label", PanelModules.MODULOS.get(k),
-                        "group", PanelModules.grupoDe(k)))
+                        "label", catalogo.modulosConEtiqueta().get(k),
+                        "group", catalogo.grupoDe(k)))
                 .toList());
-        out.put("roles", PanelModules.ROLES_CONFIGURABLES.stream()
+        out.put("roles", catalogo.rolesConfigurables().stream()
                 .map(r -> Map.of(
                         "key", r,
-                        "label", PanelModules.ETIQUETA_ROL.getOrDefault(r, r),
+                        "label", catalogo.etiquetaDeRol(r),
                         "editable", editables.contains(r)))
                 .toList());
         out.put("matrix", comoDTO(permissionService.matriz()));
         /* Para que la pantalla pueda explicar por qué el gerente no aparece
            en la tabla, en vez de dejar un hueco sin motivo. */
-        out.put("gerenteLabel", PanelModules.ETIQUETA_ROL.get(PanelModules.GERENTE));
+        out.put("gerenteLabel", catalogo.etiquetaDeRol(PanelModules.GERENTE));
         return ResponseEntity.ok(out);
     }
 
@@ -128,7 +130,7 @@ public class ApiPermissionController {
         out.put("role", rol);
         out.put("isGerente", PanelModules.esGerente(rol));
         out.put("permissions", permisosDTO(permissionService.efectivos(rol)));
-        out.put("editableRoles", PanelModules.editablesPor(rol));
+        out.put("editableRoles", catalogo.editablesPor(rol));
         return ResponseEntity.ok(out);
     }
 

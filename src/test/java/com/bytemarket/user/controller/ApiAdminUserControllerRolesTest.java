@@ -64,7 +64,8 @@ class ApiAdminUserControllerRolesTest {
                         true, true, true, true)));
 
         controlador = new ApiAdminUserController(userRepository, customerRepository,
-                mock(IBusinessConfigRepository.class), authService, s3Service, permissionService);
+                mock(IBusinessConfigRepository.class), authService, s3Service, permissionService,
+                com.bytemarket.user.service.CatalogoDePrueba.deFabrica());
     }
 
     @AfterEach

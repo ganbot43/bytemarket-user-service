@@ -3,7 +3,6 @@ package com.bytemarket.user.security;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.util.List;
 
 /**
  * Qué puesto de panel trae la sesión que está haciendo la petición.
@@ -36,11 +35,21 @@ public final class RolDeLaSesion {
     /** Igual, pero sobre una autenticación concreta (la que recibe el manager). */
     public static String deAuth(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) return null;
-        List<String> authorities = auth.getAuthorities().stream().map(Object::toString).toList();
-        for (String rol : PanelModules.DE_MAYOR_A_MENOR) {
-            if (authorities.contains("ROLE_" + rol.toUpperCase())) return rol;
-        }
-        return null;
+        /*
+         * Se lee la autoridad y se devuelve su clave, en vez de buscarla en
+         * una lista de puestos conocidos.
+         *
+         * Con la lista, un puesto creado desde el panel —que es de lo que va
+         * tener los roles en tabla— no habría casado con nada y la sesión se
+         * habría quedado sin rol: denegada en todo, sin un error que lo
+         * explicara. La autoridad la pone UserDetailsServiceImpl desde
+         * users.role, así que ya es la clave que buscamos.
+         */
+        return auth.getAuthorities().stream()
+                .map(Object::toString)
+                .filter(a -> a.startsWith("ROLE_"))
+                .map(a -> a.substring("ROLE_".length()).toLowerCase())
+                .findFirst().orElse(null);
     }
 
     /** Si la sesión trae una autoridad concreta, sea o no de la pirámide. */

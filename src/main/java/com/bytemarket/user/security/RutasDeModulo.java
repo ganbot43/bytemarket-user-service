@@ -29,7 +29,10 @@ public final class RutasDeModulo {
     private static final List<Regla> REGLAS = List.of(
             new Regla("/api/admin/users", false, "usuarios"),
             new Regla("/api/admin/business-config", false, "configuracion"),
-            new Regla("/api/admin/permissions", false, "roles"));
+            new Regla("/api/admin/permissions", false, "roles"),
+            /* Los puestos son parte de "Roles y permisos": quien reparte
+               permisos es quien inventa los puestos a los que repartirlos. */
+            new Regla("/api/admin/panel-roles", false, "roles"));
 
     /** El módulo de la petición, o null si la ruta no está declarada. */
     public static String modulo(HttpServletRequest request) {

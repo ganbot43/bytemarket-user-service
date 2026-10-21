@@ -9,6 +9,10 @@ import java.util.Optional;
 @Repository
 public interface IUserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String email);
+
+    /** Cuántos usuarios tienen este puesto: borrarlo con gente dentro los
+        dejaría sin rol y fuera del panel sin forma de volver. */
+    long countByRole(String role);
     org.springframework.data.domain.Page<User> findByRole(String role, org.springframework.data.domain.Pageable pageable);
 
     /**

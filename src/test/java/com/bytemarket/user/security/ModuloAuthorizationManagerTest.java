@@ -40,7 +40,8 @@ class ModuloAuthorizationManagerTest {
         when(repository.findByRoleAndModule(any(), any())).thenReturn(Optional.empty());
         when(repository.findByRole(any())).thenReturn(List.of());
 
-        PermissionService servicio = new PermissionService(repository);
+        PermissionService servicio = new PermissionService(repository,
+                com.bytemarket.user.service.CatalogoDePrueba.deFabrica());
         portero = new ModuloAuthorizationManager(servicio);
     }
 
@@ -51,8 +52,9 @@ class ModuloAuthorizationManagerTest {
             filas.add(i.getArgument(0));
             return i.getArgument(0);
         });
-        new PermissionService(repository).sembrar();
-        for (String rol : PanelModules.ROLES_CONFIGURABLES) {
+        new PermissionService(repository,
+                com.bytemarket.user.service.CatalogoDePrueba.deFabrica()).sembrar();
+        for (String rol : com.bytemarket.user.service.CatalogoDePrueba.deFabrica().rolesConfigurables()) {
             when(repository.findByRole(rol)).thenReturn(
                     filas.stream().filter(f -> rol.equals(f.getRole())).toList());
         }

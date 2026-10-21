@@ -67,6 +67,8 @@ public class PermissionService {
 
     private final IRolePermissionRepository repository;
 
+    private final PanelCatalogo catalogo;
+
     /**
      * Los valores por defecto, que son EXACTAMENTE lo que hoy está escrito a
      * mano en los SecurityConfig y en el menú del panel.
@@ -125,9 +127,9 @@ public class PermissionService {
     /** Crea las filas que falten. Idempotente: no pisa lo ya configurado. */
     @Transactional
     public void sembrar() {
-        for (String rol : PanelModules.ROLES_CONFIGURABLES) {
+        for (String rol : catalogo.rolesConfigurables()) {
             Map<String, Permiso> porDefecto = BASE.getOrDefault(rol, Map.of());
-            for (String modulo : PanelModules.ORDEN_MODULOS) {
+            for (String modulo : catalogo.ordenDeModulos()) {
                 if (repository.findByRoleAndModule(rol, modulo).isPresent()) continue;
                 repository.save(fila(new RolePermission(), rol, modulo,
                         porDefecto.getOrDefault(modulo, Permiso.NADA)));
@@ -160,12 +162,12 @@ public class PermissionService {
     public Map<String, Permiso> efectivos(String rol) {
         Map<String, Permiso> out = new LinkedHashMap<>();
         if (PanelModules.esGerente(rol)) {
-            PanelModules.ORDEN_MODULOS.forEach(m -> out.put(m, Permiso.TODO));
+            catalogo.ordenDeModulos().forEach(m -> out.put(m, Permiso.TODO));
             return out;
         }
-        PanelModules.ORDEN_MODULOS.forEach(m -> out.put(m, Permiso.NADA));
+        catalogo.ordenDeModulos().forEach(m -> out.put(m, Permiso.NADA));
         for (RolePermission f : repository.findByRole(rol)) {
-            if (!PanelModules.MODULOS.containsKey(f.getModule())) continue;
+            if (!catalogo.existeModulo(f.getModule())) continue;
             out.put(f.getModule(), desdeFila(f));
         }
         return out;
@@ -174,7 +176,7 @@ public class PermissionService {
     /** La matriz completa de los roles configurables. */
     public Map<String, Map<String, Permiso>> matriz() {
         Map<String, Map<String, Permiso>> out = new LinkedHashMap<>();
-        for (String rol : PanelModules.ROLES_CONFIGURABLES) out.put(rol, efectivos(rol));
+        for (String rol : catalogo.rolesConfigurables()) out.put(rol, efectivos(rol));
         return out;
     }
 
@@ -218,16 +220,16 @@ public class PermissionService {
                 rechazos.add("Los permisos del gerente no se editan: los tiene todos siempre.");
                 continue;
             }
-            if (!PanelModules.puedeEditar(rolEditor, rol)) {
+            if (!catalogo.puedeEditar(rolEditor, rol)) {
                 rechazos.add("No puedes editar los permisos de "
-                        + PanelModules.ETIQUETA_ROL.getOrDefault(rol, rol)
+                        + catalogo.etiquetaDeRol(rol)
                         + ": solo los de quienes están por debajo de ti.");
                 continue;
             }
 
             for (var porModulo : porRol.getValue().entrySet()) {
                 String modulo = porModulo.getKey();
-                if (!PanelModules.MODULOS.containsKey(modulo)) {
+                if (!catalogo.existeModulo(modulo)) {
                     rechazos.add("Módulo desconocido: " + modulo);
                     continue;
                 }
@@ -236,7 +238,7 @@ public class PermissionService {
 
                 if (propios != null && p.excedeA(propios.getOrDefault(modulo, Permiso.NADA))) {
                     rechazos.add("No puedes conceder más de lo que tú tienes en "
-                            + PanelModules.MODULOS.getOrDefault(modulo, modulo) + ".");
+                            + catalogo.modulosConEtiqueta().getOrDefault(modulo, modulo) + ".");
                     continue;
                 }
 
@@ -268,7 +270,7 @@ public class PermissionService {
         if (tope.equals(Permiso.TODO)) return 0;
 
         int tocados = 0;
-        for (String abajo : PanelModules.pordebajoDe(rol)) {
+        for (String abajo : catalogo.pordebajoDe(rol)) {
             var opcional = repository.findByRoleAndModule(abajo, modulo);
             if (opcional.isEmpty()) continue;
             RolePermission f = opcional.get();

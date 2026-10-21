@@ -29,6 +29,8 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     private final PasswordEncoder passwordEncoder;
 
+    private final com.bytemarket.user.service.PanelCatalogo panelCatalogo;
+
     private final com.bytemarket.user.service.PermissionService permissionService;
 
     @Override
@@ -38,6 +40,10 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedUsers();
         seedCustomers();
         seedBusinessConfig();
+        /* Primero el catálogo: sembrar la matriz necesita saber qué puestos
+           y qué módulos existen, y desde que viven en tabla ya no se puede
+           dar por hecho. */
+        panelCatalogo.sembrar();
         /* Crea las filas que falten con los valores por defecto, que son los
            mismos permisos que antes estaban escritos a mano. No pisa lo que
            el gerente haya configurado, así que puede correr en cada
