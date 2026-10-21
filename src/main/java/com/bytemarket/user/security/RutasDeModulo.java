@@ -62,6 +62,23 @@ public final class RutasDeModulo {
      * consultas.
      */
     public static String accion(HttpServletRequest request) {
+        /*
+         * Inhabilitar una cuenta es dar de baja, no corregir un dato.
+         *
+         * /users/{id}/status es un PUT, así que por el verbo pedía "editar".
+         * Pero quien deja a alguien sin acceso al sistema está haciendo lo
+         * mismo que un borrado —la pantalla lo llama "Inhabilitar" y la
+         * acción Eliminar se explica como "dar de baja registros"—, y con la
+         * regla del verbo bastaba el permiso de corregir un teléfono para
+         * dejar al jefe de ventas fuera del panel.
+         *
+         * Vale para las dos direcciones. Reactivar con el permiso de editar
+         * sería incoherente: quien no puede dar de baja tampoco debería poder
+         * deshacer la baja que decidió otro.
+         */
+        if (request.getRequestURI().matches("/api/admin/users/[^/]+/status")) {
+            return "delete";
+        }
         return switch (request.getMethod()) {
             case "POST" -> "create";
             case "PUT", "PATCH" -> "edit";

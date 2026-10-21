@@ -38,6 +38,7 @@ class ApiAdminUserControllerRolesTest {
     private IUserRepository userRepository;
     private ICustomerRepository customerRepository;
     private ApiAdminUserController controlador;
+    private com.bytemarket.user.service.PermissionService permissionService;
 
     private static final String ENCARGADO = "encargado@bytemarket.com";
     private static final String GERENTE = "gerente@bytemarket.com";
@@ -54,8 +55,16 @@ class ApiAdminUserControllerRolesTest {
         when(customerRepository.findByUserId(any())).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
+        /* La matriz: por defecto quien llame puede dar de baja, que es lo que
+           hacían todos antes de separar "eliminar". Los tests que prueban lo
+           contrario la cambian. */
+        permissionService = mock(com.bytemarket.user.service.PermissionService.class);
+        when(permissionService.efectivos(any())).thenReturn(
+                Map.of("usuarios", new com.bytemarket.user.service.PermissionService.Permiso(
+                        true, true, true, true)));
+
         controlador = new ApiAdminUserController(userRepository, customerRepository,
-                mock(IBusinessConfigRepository.class), authService, s3Service);
+                mock(IBusinessConfigRepository.class), authService, s3Service, permissionService);
     }
 
     @AfterEach
@@ -263,6 +272,29 @@ class ApiAdminUserControllerRolesTest {
         // El cajero no administra a nadie, así que no hay listado que darle:
         // devolver uno vacío diría "no hay usuarios", que es otra cosa.
         assertEquals(403, estado(controlador.getUsers(0, 10, "admin,superadmin", null)));
+    }
+
+    @Test
+    @DisplayName("sin el permiso de eliminar no se inhabilita una cuenta desde la edición")
+    void inhabilitarPideEliminar() {
+        /* La puerta de atrás: /users/{id}/status pide "eliminar" porque dar
+           de baja a alguien es eso. Pero el formulario de edición es un PUT
+           —que pide "editar"— y también acepta isActive, así que bastaba
+           mandarlo en el cuerpo para dejar a otro fuera del panel con el
+           permiso de corregirle el teléfono. */
+        when(permissionService.efectivos(any())).thenReturn(
+                Map.of("usuarios", new com.bytemarket.user.service.PermissionService.Permiso(
+                        true, true, true, false)));
+
+        entraComo(ENCARGADO, "admin");
+        usuario(7, "cajero@bytemarket.com", "cajero");
+
+        ResponseEntity<?> r = controlador.updateUser(7, Map.of("isActive", 0));
+        assertEquals(403, estado(r), mensaje(r));
+        assertTrue(mensaje(r).toLowerCase().contains("eliminar"), mensaje(r));
+
+        // Y lo que sí puede hacer con "editar" sigue funcionando.
+        assertEquals(200, estado(controlador.updateUser(7, Map.of("name", "Nombre nuevo"))));
     }
 
     @Test

@@ -55,6 +55,8 @@ public class ApiAdminUserController {
     private final AuthService authService;
     private final S3Service s3Service;
 
+    private final com.bytemarket.user.service.PermissionService permissionService;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     // ─── CONFIGURACIÓN ──────────────────────────────────────────
@@ -178,6 +180,25 @@ public class ApiAdminUserController {
             if (tieneRol(rol.toUpperCase())) return rol;
         }
         return null;
+    }
+
+    /**
+     * Si quien llama puede dar de baja cuentas.
+     *
+     * Se pregunta a la matriz y no al rol: desde que los permisos se
+     * reparten desde el panel, "es encargado" ya no dice qué puede hacer.
+     */
+    private boolean puedeDarDeBaja() {
+        String rol = rolDelLlamante();
+        if (rol == null) return false;
+        if (PanelModules.esGerente(rol)) return true;
+        var p = permissionService.efectivos(rol).get("usuarios");
+        return p != null && p.eliminar();
+    }
+
+    private static ResponseEntity<Map<String, Object>> soloConEliminar() {
+        return ResponseEntity.status(403).body(Map.of("statusCode", 403,
+                "message", "Inhabilitar o reactivar una cuenta pide el permiso de eliminar en Usuarios."));
     }
 
     /** Nivel del llamante en la pirámide; -1 si no trae rol de panel. */
@@ -347,7 +368,19 @@ public class ApiAdminUserController {
         if (cambiaEmail) user.setEmail(email);
         if (role != null) user.setRole(role);
         if (body.containsKey("dni") && !"customer".equals(user.getRole())) user.setDni(dni);
-        if (body.get("isActive") instanceof Number n) user.setIsActive(n.intValue());
+        /*
+         * Cambiar isActive desde aquí es dar de baja por la puerta de atrás.
+         *
+         * Esta ruta es un PUT, así que pide el permiso de "editar". La de
+         * /status pide "eliminar" porque inhabilitar a alguien es dar de
+         * baja, y sin esta comprobación bastaba mandar isActive en el cuerpo
+         * del formulario de edición para saltarse esa regla: el permiso de
+         * corregir un teléfono dejaría al jefe de ventas fuera del panel.
+         */
+        if (body.get("isActive") instanceof Number n) {
+            if (!puedeDarDeBaja()) return soloConEliminar();
+            user.setIsActive(n.intValue());
+        }
         userRepository.save(user);
 
         if (!"customer".equals(user.getRole())) {
