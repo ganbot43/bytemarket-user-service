@@ -230,6 +230,41 @@ class ApiAdminUserControllerRolesTest {
 
     // ── Y el jefe de ventas, donde ya estaba ────────────────────
 
+    // ── Lo que abrió hacer dinámico el permiso de la puerta ─────
+
+    @Test
+    @DisplayName("un cajero con el módulo Usuarios concedido no administra a nadie")
+    void elCajeroConElModuloNoAdministraANadie() {
+        /* La escalada que abrió pasar /api/admin/** a decidirse por la matriz:
+           el gerente concede "Usuarios" al cajero, el cajero entra —antes la
+           ruta tenía suelo de rol y no llegaba nunca— y la vieja comprobación
+           preguntaba literalmente por JEFE_VENTAS, así que respondía que no y
+           lo dejaba caer por la rama SIN restricción. Podía crearse un
+           gerente. */
+        entraComo("cajero@bytemarket.com", "cajero");
+
+        assertEquals(403, estado(controlador.createUser(alta("superadmin"))),
+                "un cajero no fabrica gerentes");
+        assertEquals(403, estado(controlador.createUser(alta("admin"))));
+        assertEquals(403, estado(controlador.createUser(alta("cajero"))),
+                "ni siquiera a otro de su propio nivel");
+        verify(userRepository, never()).save(any(User.class));
+
+        usuario(9, "otro@bytemarket.com", "cajero");
+        assertEquals(403, estado(controlador.deleteUser(9)));
+        assertEquals(403, estado(controlador.updateUser(9, Map.of("role", "cajero"))));
+    }
+
+    @Test
+    @DisplayName("el listado solo trae a quien se puede administrar")
+    void elListadoSeLimitaALoAdministrable() {
+        entraComo("cajero@bytemarket.com", "cajero");
+
+        // El cajero no administra a nadie, así que no hay listado que darle:
+        // devolver uno vacío diría "no hay usuarios", que es otra cosa.
+        assertEquals(403, estado(controlador.getUsers(0, 10, "admin,superadmin", null)));
+    }
+
     @Test
     @DisplayName("el jefe de ventas sigue limitado a cajeros")
     void elJefeSigueEnLoSuyo() {

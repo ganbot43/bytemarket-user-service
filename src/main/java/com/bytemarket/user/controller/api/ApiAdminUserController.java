@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import com.bytemarket.user.security.PanelModules;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -109,10 +110,14 @@ public class ApiAdminUserController {
                                       @RequestParam(defaultValue = "10") int size,
                                       @RequestParam(defaultValue = "customer") String role,
                                       @RequestParam(required = false) String q) {
-        /* El jefe de ventas solo ve cajeros, aunque pida otra cosa en el
-           parámetro: si no, desde la misma pantalla en la que da de alta a
-           su gente podría listar los correos de la dirección. */
-        if (soloPuedeCajeros()) role = "cajero";
+        /* Se ve solo a quien se puede administrar, aunque se pida otra cosa
+           en el parámetro: si no, desde la misma pantalla en la que se da de
+           alta a su gente se podrían listar los correos de la dirección. */
+        if (!esGerente() && !tieneRol("ADMIN")) {
+            List<String> permitidos = administrables();
+            if (permitidos.isEmpty()) return noAdministras();
+            role = String.join(",", permitidos);
+        }
 
         List<String> roles = Arrays.stream(role.split(","))
                 .map(String::trim).filter(r -> !r.isBlank())
@@ -134,21 +139,78 @@ public class ApiAdminUserController {
     }
 
     /**
-     * Si quien llama es jefe de ventas, solo puede tocar cajeros.
+     * A quién puede administrar quien llama: solo a los de abajo.
      *
-     * El permiso de la ruta le deja entrar a la gestión de usuarios —tiene
-     * que poder habilitar a su gente— pero no a crearse un admin ni a
-     * desactivar al gerente. Sin esto, "habilita cajeros" sería en la
-     * práctica "habilita lo que quiera", y la separación de roles que
-     * justifica todo esto se vendría abajo.
+     * Antes esto era `soloPuedeCajeros()`, que preguntaba literalmente por
+     * el rol JEFE_VENTAS. Funcionaba mientras la ruta tuviera suelo de rol,
+     * porque un cajero no llegaba nunca. Al pasar /api/admin/** a decidirse
+     * por la matriz, conceder "Usuarios" a un cajero lo metía aquí — y la
+     * pregunta por JEFE_VENTAS respondía que NO, así que caía por la rama
+     * sin restricción y podía crearse un gerente. Escalada completa, abierta
+     * por hacer dinámico el permiso de la puerta sin generalizar la regla de
+     * dentro.
+     *
+     * Ahora se mide por nivel en la pirámide, que es lo que el nombre del
+     * rol solo insinuaba: cada puesto administra a los que están
+     * ESTRICTAMENTE por debajo. El cajero, que es el último, no administra a
+     * nadie: tener el módulo no le sirve de nada, y eso es justo lo que debe
+     * pasar.
+     *
+     * El encargado conserva el alcance de siempre —todo menos el gerente,
+     * que lo sigue cortando {@link #esGerente()}—, y los clientes siguen
+     * siendo de la gestión de tienda: el jefe de ventas no los tocaba antes
+     * y no los toca ahora.
      */
-    private static boolean soloPuedeCajeros() {
-        return tieneRol("JEFE_VENTAS") && !tieneRol("ADMIN") && !tieneRol("SUPERADMIN");
+    private static boolean puedeAdministrar(String rolDestino) {
+        if (esGerente() || tieneRol("ADMIN")) return true;
+
+        int mio = nivelDelLlamante();
+        if (mio < 0) return false;
+        // Los clientes no están en la pirámide del personal.
+        int suyo = PanelModules.nivel(rolDestino);
+        return suyo >= 0 && mio > suyo;
     }
 
-    private static ResponseEntity<Map<String, Object>> soloCajeros() {
-        return ResponseEntity.status(403).body(Map.of("statusCode", 403,
-                "message", "Como jefe de ventas solo puedes gestionar cajeros."));
+    /** El rol de panel del llamante, o null si no trae ninguno. */
+    private static String rolDelLlamante() {
+        for (String rol : List.of(PanelModules.GERENTE, PanelModules.ENCARGADO,
+                PanelModules.JEFE_VENTAS, PanelModules.CAJERO)) {
+            if (tieneRol(rol.toUpperCase())) return rol;
+        }
+        return null;
+    }
+
+    /** Nivel del llamante en la pirámide; -1 si no trae rol de panel. */
+    private static int nivelDelLlamante() {
+        String rol = rolDelLlamante();
+        return rol == null ? -1 : PanelModules.nivel(rol);
+    }
+
+    /** Los roles que este llamante puede administrar, para filtrar listados. */
+    private static List<String> administrables() {
+        return ROLES_VALIDOS.stream().filter(ApiAdminUserController::puedeAdministrar).toList();
+    }
+
+    /**
+     * El mensaje nombra el puesto de quien llama.
+     *
+     * "No tienes permiso" obliga a adivinar; decir "como jefe de ventas"
+     * explica la regla en la misma frase que la niega. Antes el texto estaba
+     * escrito para el jefe porque era el único caso posible; ahora se compone,
+     * y sigue nombrando el puesto.
+     */
+    private static ResponseEntity<Map<String, Object>> noAdministras() {
+        String rol = rolDelLlamante();
+        String etiqueta = rol == null ? "tu puesto"
+                : "como " + PanelModules.ETIQUETA_ROL.getOrDefault(rol, rol).toLowerCase();
+        String mensaje = administrables().isEmpty()
+                ? capitalizar(etiqueta) + " no administras a nadie."
+                : capitalizar(etiqueta) + " solo administras a quienes están por debajo de tu puesto.";
+        return ResponseEntity.status(403).body(Map.of("statusCode", 403, "message", mensaje));
+    }
+
+    private static String capitalizar(String t) {
+        return t.isEmpty() ? t : Character.toUpperCase(t.charAt(0)) + t.substring(1);
     }
 
     private static boolean tieneRol(String rol) {
@@ -218,7 +280,7 @@ public class ApiAdminUserController {
         }
         if (password.length() < 6) return error(400, "La contraseña debe tener al menos 6 caracteres");
         if (!ROLES_VALIDOS.contains(role)) return error(400, "Rol inválido: " + role);
-        if (soloPuedeCajeros() && !"cajero".equals(role)) return soloCajeros();
+        if (!puedeAdministrar(role)) return noAdministras();
         if ("superadmin".equals(role) && !esGerente()) return soloElGerente();
         if (userRepository.findByEmail(email).isPresent()) return error(400, "El correo ya está registrado");
         if (dni != null && customerRepository.existsByDni(dni)) return error(400, "El DNI ya está registrado");
@@ -259,9 +321,8 @@ public class ApiAdminUserController {
         if (role != null && !ROLES_VALIDOS.contains(role)) return error(400, "Rol inválido: " + role);
         // Se mira el rol QUE TIENE y el que se le quiere poner: lo primero
         // impide editar a un admin, lo segundo ascender a un cajero.
-        if (soloPuedeCajeros()
-                && (!"cajero".equals(user.getRole()) || (role != null && !"cajero".equals(role)))) {
-            return soloCajeros();
+        if (!puedeAdministrar(user.getRole()) || (role != null && !puedeAdministrar(role))) {
+            return noAdministras();
         }
         // Mismo criterio con el gerente: el rol que tiene y el que se le
         // quiere poner. Sin la primera mitad, un encargado degradaba al
@@ -311,7 +372,7 @@ public class ApiAdminUserController {
         if (found.isEmpty()) return error(404, "Usuario no encontrado");
         User user = found.get();
 
-        if (soloPuedeCajeros() && !"cajero".equals(user.getRole())) return soloCajeros();
+        if (!puedeAdministrar(user.getRole())) return noAdministras();
         if (!esGerente() && "superadmin".equals(user.getRole())) return soloElGerente();
         if (esElMismo(user)) return contraTiMismo("desactivar");
 
@@ -331,7 +392,7 @@ public class ApiAdminUserController {
 
         // Sin esto, el jefe podría borrar al gerente desde la misma pantalla
         // en la que da de alta a un cajero.
-        if (soloPuedeCajeros() && !"cajero".equals(user.getRole())) return soloCajeros();
+        if (!puedeAdministrar(user.getRole())) return noAdministras();
         if (!esGerente() && "superadmin".equals(user.getRole())) return soloElGerente();
         // Y el guardián del último gerente: como nadie puede borrarse a sí
         // mismo, siempre queda al menos uno con quien arreglar lo demás.
